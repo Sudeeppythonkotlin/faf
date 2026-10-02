@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your profile — FAF</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main style="justify-content:flex-start">
+  <div class="logo" style="font-size:40px">FAF</div>
+  <p class="headline" style="font-size:24px">Your student profile</p>
+
+  <label class="lbl">Display name</label>
+  <input id="name" maxlength="30" placeholder="e.g. Ananya">
+
+  <label class="lbl">Date of birth <span class="hint">(must be 18+, only your age is shown)</span></label>
+  <input id="dob" type="date">
+
+  <label class="lbl">Gender</label>
+  <select id="gender">
+    <option value="">Select</option><option>Male</option><option>Female</option>
+    <option>Non-binary</option><option>Prefer not to say</option>
+  </select>
+
+  <label class="lbl">College name</label>
+  <input id="college" maxlength="80" placeholder="e.g. Mar Ivanios College">
+
+  <label class="lbl">University <span class="hint">(start typing, then pick from the list)</span></label>
+  <input id="uni" list="unis" placeholder="e.g. University of Kerala" autocomplete="off">
+  <datalist id="unis"></datalist>
+  <p class="hint" id="stateLine"></p>
+
+  <label class="lbl">Interests <span class="hint">(pick up to 8)</span></label>
+  <div id="chips" class="chips"></div>
+
+  <label class="lbl">Short bio <span class="hint">(optional, 100 characters)</span></label>
+  <input id="bio" maxlength="100" placeholder="Say something fun">
+
+  <button class="btn" id="save">Save profile</button>
+  <p class="error" id="err"></p>
+</main>
+<script type="module">
+  import { auth, db, watchUser } from "./firebase.js";
+  import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+  import { UNIVERSITIES, INTERESTS, findUniversityByName, findUniversityById } from "./universities.js";
+
+  const $ = (id) => document.getElementById(id);
+  const selected = new Set();
+  let uid = null, existing = {};
+
+  $("unis").innerHTML = UNIVERSITIES.map((u) => `<option value="${u.name}">`).join("");
+  $("chips").innerHTML = INTERESTS.map(([id, label]) => `<button type="button" class="chip" data-id="${id}">${label}</button>`).join("");
+  $("chips").addEventListener("click", (e) => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    const id = b.dataset.id;
+    if (selected.has(id)) { selected.delete(id); b.classList.remove("on"); }
+    else if (selected.size < 8) { selected.add(id); b.classList.add("on"); }
+  });
+  $("uni").addEventListener("input", () => {
+    const u = findUniversityByName($("uni").value);
+    $("stateLine").textContent = u ? "State: " + u.state : "";
+  });
+
+  // 18+ cutoff for the date picker
+  const t = new Date(); t.setFullYear(t.getFullYear() - 18);
+  $("dob").max = t.toISOString().slice(0, 10);
+
+  function ageFrom(dobStr) {
+    const d = new Date(dobStr), n = new Date();
+    let a = n.getFullYear() - d.getFullYear();
+    const m = n.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && n.getDate() < d.getDate())) a--;
+    return a;
+  }
+
+  watchUser(async (u) => {
+    if (!u) { location.href = "join.html"; return; }
+    uid = u.uid;
+    const snap = await getDoc(doc(db, "users", uid));
+    existing = snap.exists() ? snap.data() : {};
+    $("name").value = existing.displayName || (u.displayName || "").split(" ")[0];
+    $("dob").value = existing.dateOfBirth || "";
+    $("gender").value = existing.gender || "";
+    $("college").value = existing.collegeName || "";
+    const un = findUniversityById(existing.universityId);
+    if (un) { $("uni").value = un.name; $("stateLine").textContent = "State: " + un.state; }
+    (existing.interests || []).forEach((id) => {
+      selected.add(id);
+      const b = document.querySelector(`.chip[data-id="${id}"]`); if (b) b.classList.add("on");
+    });
+    $("bio").value = existing.bio || "";
+  });
+
+  $("save").addEventListener("click", async () => {
+    const err = $("err"); err.textContent = "";
+    const name = $("name").value.trim(), dob = $("dob").value, gender = $("gender").value;
+    const college = $("college").value.trim(), uni = findUniversityByName($("uni").value);
+    if (!name) return err.textContent = "Please enter a display name.";
+    if (!dob) return err.textContent = "Please enter your date of birth.";
+    const age = ageFrom(dob);
+    if (age < 18) return err.textContent = "FAF is for students aged 18 and above.";
+    if (age > 60) return err.textContent = "Please check your date of birth.";
+    if (!gender) return err.textContent = "Please select a gender option.";
+    if (!college) return err.textContent = "Please enter your college name.";
+    if (!uni) return err.textContent = "Please pick your university from the list.";
+    if (selected.size < 1) return err.textContent = "Pick at least one interest.";
+
+    $("save").disabled = true; $("save").textContent = "Saving...";
+    try {
+      const data = {
+        displayName: name, dateOfBirth: dob, age, gender,
+        collegeName: college, universityId: uni.id, stateId: uni.stateId,
+        interests: [...selected], bio: $("bio").value.trim(),
+        updatedAt: serverTimestamp(),
+      };
+      if (existing.rand === undefined) data.rand = Math.random(); // hidden random key used by FIND SOMEONE (Day 4)
+      await setDoc(doc(db, "users", uid), data, { merge: true });
+      location.href = "home.html";
+    } catch (e) {
+      console.error(e);
+      err.textContent = "Could not save. Please try again.";
+      $("save").disabled = false; $("save").textContent = "Save profile";
+    }
+  });
+</script>
+</body>
+</html>

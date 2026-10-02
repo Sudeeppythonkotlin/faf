@@ -10,10 +10,12 @@ service cloud.firestore {
         && request.resource.data.accountStatus == 'active';
       allow update: if request.auth != null && request.auth.uid == uid
         && request.resource.data.accountStatus == resource.data.accountStatus
-        && request.resource.data.ageConfirmed == true;
+        && request.resource.data.ageConfirmed == true
+        && (!('age' in request.resource.data) || request.resource.data.age >= 18)
+        && (!('bio' in request.resource.data) || request.resource.data.bio.size() <= 100)
+        && (!('interests' in request.resource.data) || request.resource.data.interests.size() <= 8);
       allow delete: if false;
     }
-    // Added in Day 2: universities/states (read-only for signed-in users)
     match /{document=**} { allow read, write: if false; }
   }
 }

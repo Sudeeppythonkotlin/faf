@@ -19,3 +19,12 @@ h1.sm { font-size:48px; }
 label.check { display:flex; gap:12px; align-items:flex-start; margin-top:28px; font-size:14px; background:#fff; padding:16px; border-radius:18px; }
 label.check input { width:20px; height:20px; margin-top:2px; accent-color:var(--violet); }
 .error { color:#c0392b; font-size:14px; margin-top:12px; }
+
+/* Day 2: forms */
+.lbl { display:block; margin-top:18px; font-weight:700; font-size:14px; }
+.hint { font-weight:400; font-size:12px; color:rgba(20,18,43,.55); margin-top:4px; }
+input, select { width:100%; margin-top:6px; padding:14px; border:1px solid rgba(20,18,43,.15); border-radius:14px; font-size:16px; background:#fff; color:var(--ink); }
+input:focus, select:focus { outline:2px solid var(--violet); border-color:transparent; }
+.chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.chip { padding:10px 14px; border-radius:999px; border:1px solid rgba(20,18,43,.15); background:#fff; font-size:14px; cursor:pointer; }
+.chip.on { background:var(--violet); color:#fff; border-color:var(--violet); }

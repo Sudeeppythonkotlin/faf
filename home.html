@@ -9,16 +9,32 @@
 <body>
 <main class="center" id="app"><p class="muted">Loading...</p></main>
 <script type="module">
-  import { watchUser, logout } from "./firebase.js";
-  watchUser((u) => {
+  import { db, watchUser, logout } from "./firebase.js";
+  import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+  import { findUniversityById, INTERESTS } from "./universities.js";
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  watchUser(async (u) => {
     if (!u) { location.href = "join.html"; return; }
-    const name = (u.displayName || "you").replace(/</g, "&lt;");
+    const snap = await getDoc(doc(db, "users", u.uid));
+    const p = snap.exists() ? snap.data() : {};
+    if (!p.universityId) { location.href = "profile.html"; return; }
+
+    const uni = findUniversityById(p.universityId);
+    const labels = Object.fromEntries(INTERESTS);
     document.getElementById("app").innerHTML = `
       <div class="logo" style="font-size:48px">FAF</div>
-      <p class="muted">Signed in as ${name}</p>
-      <p class="headline">Day 1 done ✅</p>
-      <p class="muted" style="font-size:14px">Next: choose your university and build your profile.</p>
-      <div><button class="btn ghost" id="out" style="margin-top:28px">Log out</button></div>`;
+      <p class="headline" style="font-size:24px">Hi ${esc(p.displayName)} 👋</p>
+      <div class="card" style="text-align:center">
+        <b>${esc(p.displayName)}, ${esc(p.age)}</b>
+        <span>${esc(p.collegeName)}<br>${esc(uni ? uni.name : "")}${uni ? " · " + esc(uni.state) : ""}</span>
+        <p style="margin-top:10px;font-size:14px">${(p.interests || []).map((i) => esc(labels[i] || i)).join(" · ")}</p>
+        ${p.bio ? `<p class="muted" style="font-size:14px">${esc(p.bio)}</p>` : ""}
+      </div>
+      <p class="headline" style="font-size:20px;margin-top:24px">Day 2 done ✅</p>
+      <p class="muted" style="font-size:14px">Next: build your avatar and add your social links.</p>
+      <a class="btn ghost" href="profile.html" style="margin-top:20px">Edit profile</a>
+      <div><button class="btn ghost" id="out" style="margin-top:12px">Log out</button></div>`;
     document.getElementById("out").onclick = async () => { await logout(); location.href = "index.html"; };
   });
 </script>
