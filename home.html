@@ -10,8 +10,10 @@
 <main class="center" id="app"><p class="muted">Loading...</p></main>
 <script type="module">
   import { db, watchUser, logout } from "./firebase.js";
-  import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+  import { doc, getDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
   import { findUniversityById, INTERESTS } from "./universities.js";
+  import { renderAvatar } from "./avatar.js";
+  import { PLATFORMS } from "./social.js";
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   watchUser(async (u) => {
@@ -19,21 +21,31 @@
     const snap = await getDoc(doc(db, "users", u.uid));
     const p = snap.exists() ? snap.data() : {};
     if (!p.universityId) { location.href = "profile.html"; return; }
+    if (!p.avatarConfig) { location.href = "avatar.html"; return; }
+    const socials = await getDocs(collection(db, "users", u.uid, "socials"));
+    if (socials.empty) { location.href = "social.html"; return; }
 
     const uni = findUniversityById(p.universityId);
     const labels = Object.fromEntries(INTERESTS);
+    const chips = []; socials.forEach((d) => { const pl = PLATFORMS.find((x) => x.id === d.id); if (pl) chips.push(`${pl.icon} ${pl.label}${d.data().visible === false ? " (hidden)" : ""}`); });
+
     document.getElementById("app").innerHTML = `
       <div class="logo" style="font-size:48px">FAF</div>
-      <p class="headline" style="font-size:24px">Hi ${esc(p.displayName)} 👋</p>
       <div class="card" style="text-align:center">
-        <b>${esc(p.displayName)}, ${esc(p.age)}</b>
+        <div class="preview sm">${renderAvatar(p.avatarConfig)}</div>
+        <b style="margin-top:10px">${esc(p.displayName)}, ${esc(p.age)}</b>
         <span>${esc(p.collegeName)}<br>${esc(uni ? uni.name : "")}${uni ? " · " + esc(uni.state) : ""}</span>
         <p style="margin-top:10px;font-size:14px">${(p.interests || []).map((i) => esc(labels[i] || i)).join(" · ")}</p>
         ${p.bio ? `<p class="muted" style="font-size:14px">${esc(p.bio)}</p>` : ""}
+        <p style="margin-top:10px;font-size:14px">${chips.join("<br>")}</p>
       </div>
-      <p class="headline" style="font-size:20px;margin-top:24px">Day 2 done ✅</p>
-      <p class="muted" style="font-size:14px">Next: build your avatar and add your social links.</p>
-      <a class="btn ghost" href="profile.html" style="margin-top:20px">Edit profile</a>
+      <p class="headline" style="font-size:20px;margin-top:24px">Day 3 done ✅</p>
+      <p class="muted" style="font-size:14px">Your profile is complete. Next: the FIND SOMEONE engine.</p>
+      <div style="margin-top:16px">
+        <a class="btn ghost" href="profile.html">Edit profile</a>
+        <a class="btn ghost" href="avatar.html">Edit avatar</a>
+        <a class="btn ghost" href="social.html">Edit links</a>
+      </div>
       <div><button class="btn ghost" id="out" style="margin-top:12px">Log out</button></div>`;
     document.getElementById("out").onclick = async () => { await logout(); location.href = "index.html"; };
   });

@@ -28,3 +28,13 @@ input:focus, select:focus { outline:2px solid var(--violet); border-color:transp
 .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
 .chip { padding:10px 14px; border-radius:999px; border:1px solid rgba(20,18,43,.15); background:#fff; font-size:14px; cursor:pointer; }
 .chip.on { background:var(--violet); color:#fff; border-color:var(--violet); }
+
+/* Day 3: avatar + social */
+.preview { width:220px; height:220px; margin:16px auto 0; border-radius:50%; overflow:hidden; box-shadow:0 8px 24px rgba(20,18,43,.15); }
+.preview.sm { width:140px; height:140px; margin:0 auto; }
+.preview svg { width:100%; height:100%; display:block; }
+.swatch { width:34px; height:34px; border-radius:50%; border:2px solid rgba(20,18,43,.12); cursor:pointer; }
+.swatch.on { outline:3px solid var(--violet); outline-offset:2px; }
+.tog { display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:rgba(20,18,43,.7); }
+.tog input { width:18px; height:18px; margin:0; accent-color:var(--violet); }
+.btn.ghost + .btn.ghost { margin-left:6px; }

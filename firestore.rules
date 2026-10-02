@@ -15,6 +15,16 @@ service cloud.firestore {
         && (!('bio' in request.resource.data) || request.resource.data.bio.size() <= 100)
         && (!('interests' in request.resource.data) || request.resource.data.interests.size() <= 8);
       allow delete: if false;
+
+      // Private social handles: owner only. (Other students only ever see them through the FIND SOMEONE engine.)
+      match /socials/{platform} {
+        allow read, delete: if request.auth != null && request.auth.uid == uid;
+        allow create, update: if request.auth != null && request.auth.uid == uid
+          && platform in ['instagram', 'snapchat', 'linkedin', 'discord']
+          && request.resource.data.handle is string
+          && request.resource.data.handle.size() <= 100
+          && request.resource.data.visible is bool;
+      }
     }
     match /{document=**} { allow read, write: if false; }
   }

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your social links — FAF</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main style="justify-content:flex-start">
+  <div class="logo" style="font-size:40px">FAF</div>
+  <p class="headline" style="font-size:24px">How can people connect?</p>
+  <p class="muted" style="font-size:14px">FAF has no chat. Add at least one account. Others only see accounts you switch on.</p>
+  <div id="list"></div>
+  <button class="btn" id="save">Save &amp; continue</button>
+  <p class="error" id="err"></p>
+</main>
+<script type="module">
+  import { db, watchUser } from "./firebase.js";
+  import { doc, getDoc, getDocs, setDoc, deleteDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+  import { PLATFORMS, normalizeHandle } from "./social.js";
+
+  const $ = (id) => document.getElementById(id);
+  let uid = null, userData = {}, existing = {};
+
+  $("list").innerHTML = PLATFORMS.map((p) => `
+    <div class="card">
+      <b>${p.icon} ${p.label}</b>
+      <input id="h-${p.id}" placeholder="${p.ph}" autocapitalize="none" autocomplete="off">
+      <label class="tog"><input type="checkbox" id="v-${p.id}" checked> Show on my profile</label>
+    </div>`).join("");
+
+  watchUser(async (u) => {
+    if (!u) { location.href = "join.html"; return; }
+    uid = u.uid;
+    const us = await getDoc(doc(db, "users", uid));
+    userData = us.exists() ? us.data() : {};
+    const snap = await getDocs(collection(db, "users", uid, "socials"));
+    snap.forEach((d) => {
+      existing[d.id] = d.data();
+      const h = $("h-" + d.id), v = $("v-" + d.id);
+      if (h) { h.value = d.data().handle || ""; v.checked = d.data().visible !== false; }
+    });
+  });
+
+  $("save").onclick = async () => {
+    const err = $("err"); err.textContent = "";
+    const entries = [];
+    for (const p of PLATFORMS) {
+      const raw = $("h-" + p.id).value.trim();
+      if (!raw) { entries.push({ p, handle: null }); continue; }
+      const handle = normalizeHandle(p.id, raw);
+      if (!handle) return err.textContent = `That ${p.label} username doesn't look right.`;
+      entries.push({ p, handle, visible: $("v-" + p.id).checked });
+    }
+    const filled = entries.filter((e) => e.handle);
+    if (!filled.length) return err.textContent = "Add at least one account.";
+    if (!filled.some((e) => e.visible)) return err.textContent = "Switch on at least one account so people can connect with you.";
+
+    $("save").disabled = true; $("save").textContent = "Saving...";
+    try {
+      for (const e of entries) {
+        const ref = doc(db, "users", uid, "socials", e.p.id);
+        if (e.handle) await setDoc(ref, { handle: e.handle, visible: e.visible, updatedAt: serverTimestamp() }, { merge: true });
+        else if (existing[e.p.id]) await deleteDoc(ref);
+      }
+      const upd = { profileComplete: true, updatedAt: serverTimestamp() };
+      if (!userData.profileComplete) upd.discoverable = true; // turned ON the first time; user controls it later
+      await setDoc(doc(db, "users", uid), upd, { merge: true });
+      location.href = "home.html";
+    } catch (er) {
+      console.error(er); err.textContent = "Could not save. Please try again.";
+      $("save").disabled = false; $("save").textContent = "Save & continue";
+    }
+  };
+</script>
+</body>
+</html>
