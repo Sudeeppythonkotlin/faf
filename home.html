@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FAF</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="center" id="app"><p class="muted">Loading...</p></main>
+<script type="module">
+  import { watchUser, logout } from "./firebase.js";
+  watchUser((u) => {
+    if (!u) { location.href = "join.html"; return; }
+    const name = (u.displayName || "you").replace(/</g, "&lt;");
+    document.getElementById("app").innerHTML = `
+      <div class="logo" style="font-size:48px">FAF</div>
+      <p class="muted">Signed in as ${name}</p>
+      <p class="headline">Day 1 done ✅</p>
+      <p class="muted" style="font-size:14px">Next: choose your university and build your profile.</p>
+      <div><button class="btn ghost" id="out" style="margin-top:28px">Log out</button></div>`;
+    document.getElementById("out").onclick = async () => { await logout(); location.href = "index.html"; };
+  });
+</script>
+</body>
+</html>

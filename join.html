@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Join FAF</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <div class="logo" style="font-size:48px">FAF</div>
+  <p class="headline">Join in one tap.</p>
+  <p class="muted" style="font-size:14px">For students aged 18+ at colleges and universities in India.</p>
+  <label class="check">
+    <input type="checkbox" id="is18">
+    <span>I confirm that I am <b>18 years or older</b>, and I am a student in India.</span>
+  </label>
+  <label class="check" style="margin-top:12px">
+    <input type="checkbox" id="terms">
+    <span>I agree to the Terms and Privacy Policy.</span>
+  </label>
+  <button class="btn dark" id="go" disabled>Continue with Google</button>
+  <p class="error" id="err"></p>
+</main>
+<script type="module">
+  import { signInWithGoogle, watchUser } from "./firebase.js";
+  const a = document.getElementById("is18"), b = document.getElementById("terms");
+  const btn = document.getElementById("go"), err = document.getElementById("err");
+  const sync = () => btn.disabled = !(a.checked && b.checked);
+  a.addEventListener("change", sync); b.addEventListener("change", sync);
+  btn.addEventListener("click", async () => {
+    btn.disabled = true; btn.textContent = "Signing in..."; err.textContent = "";
+    try { await signInWithGoogle(); location.href = "home.html"; }
+    catch (e) { err.textContent = "Sign-in failed. Please try again."; btn.textContent = "Continue with Google"; sync(); console.error(e); }
+  });
+  watchUser((u) => { if (u) location.href = "home.html"; });
+</script>
+</body>
+</html>

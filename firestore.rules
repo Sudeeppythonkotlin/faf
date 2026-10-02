@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read/write only their OWN doc. No listing or enumeration.
+    match /users/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list: if false;
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.ageConfirmed == true
+        && request.resource.data.accountStatus == 'active';
+      allow update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.accountStatus == resource.data.accountStatus
+        && request.resource.data.ageConfirmed == true;
+      allow delete: if false;
+    }
+    // Added in Day 2: universities/states (read-only for signed-in users)
+    match /{document=**} { allow read, write: if false; }
+  }
+}
