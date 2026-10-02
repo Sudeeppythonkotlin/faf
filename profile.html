@@ -47,7 +47,7 @@
 
   const $ = (id) => document.getElementById(id);
   const selected = new Set();
-  let uid = null, existing = {};
+  let uid = null, existing = {}, docExists = false;
 
   $("unis").innerHTML = UNIVERSITIES.map((u) => `<option value="${u.name}">`).join("");
   $("chips").innerHTML = INTERESTS.map(([id, label]) => `<button type="button" class="chip" data-id="${id}">${label}</button>`).join("");
@@ -78,7 +78,8 @@
     if (!u) { location.href = "join.html"; return; }
     uid = u.uid;
     const snap = await getDoc(doc(db, "users", uid));
-    existing = snap.exists() ? snap.data() : {};
+    docExists = snap.exists();
+    existing = docExists ? snap.data() : {};
     $("name").value = existing.displayName || (u.displayName || "").split(" ")[0];
     $("dob").value = existing.dateOfBirth || "";
     $("gender").value = existing.gender || "";
@@ -114,6 +115,11 @@
         interests: [...selected], bio: $("bio").value.trim(),
         updatedAt: serverTimestamp(),
       };
+      if (!docExists) {
+        // account record was never created (e.g. rules not yet published at sign-up): create it now
+        Object.assign(data, { uid, ageConfirmed: true, accountStatus: "active", discoverable: false,
+          profileComplete: false, createdAt: serverTimestamp(), lastActiveAt: serverTimestamp() });
+      }
       if (existing.rand === undefined) data.rand = Math.random(); // hidden random key used by FIND SOMEONE (Day 4)
       await setDoc(doc(db, "users", uid), data, { merge: true });
       location.href = "home.html";
