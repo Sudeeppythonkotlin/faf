@@ -1,4 +1,3 @@
-// 1) Paste your Firebase web-app config below (Firebase console > Project settings > Your apps).
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
