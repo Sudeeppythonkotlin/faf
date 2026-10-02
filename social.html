@@ -19,6 +19,7 @@
   import { db, watchUser } from "./firebase.js";
   import { doc, getDoc, getDocs, setDoc, deleteDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
   import { PLATFORMS, normalizeHandle } from "./social.js";
+  import { syncPool } from "./pool.js";
 
   const $ = (id) => document.getElementById(id);
   let uid = null, userData = {}, existing = {};
@@ -67,6 +68,7 @@
       const upd = { profileComplete: true, updatedAt: serverTimestamp() };
       if (!userData.profileComplete) upd.discoverable = true; // turned ON the first time; user controls it later
       await setDoc(doc(db, "users", uid), upd, { merge: true });
+      await syncPool(db, uid);
       location.href = "home.html";
     } catch (er) {
       console.error(er); err.textContent = "Could not save. Please try again.";

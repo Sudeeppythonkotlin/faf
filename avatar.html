@@ -21,6 +21,7 @@
   import { db, watchUser } from "./firebase.js";
   import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
   import { OPTIONS, defaultAvatar, randomAvatar, renderAvatar } from "./avatar.js";
+  import { syncPool } from "./pool.js";
 
   const $ = (id) => document.getElementById(id);
   let cfg = defaultAvatar(), uid = null;
@@ -54,6 +55,7 @@
     $("save").disabled = true; $("save").textContent = "Saving...";
     try {
       await setDoc(doc(db, "users", uid), { avatarConfig: cfg, updatedAt: serverTimestamp() }, { merge: true });
+      await syncPool(db, uid);
       location.href = "home.html";
     } catch (e) {
       console.error(e); $("err").textContent = "Could not save. Please try again.";

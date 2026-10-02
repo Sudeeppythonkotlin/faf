@@ -10,7 +10,8 @@
 <main class="center" id="app"><p class="muted">Loading...</p></main>
 <script type="module">
   import { db, watchUser, logout } from "./firebase.js";
-  import { doc, getDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+  import { doc, getDoc, getDocs, setDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+  import { syncPool } from "./pool.js";
   import { findUniversityById, INTERESTS } from "./universities.js";
   import { renderAvatar } from "./avatar.js";
   import { PLATFORMS } from "./social.js";
@@ -24,6 +25,10 @@
     if (!p.avatarConfig) { location.href = "avatar.html"; return; }
     const socials = await getDocs(collection(db, "users", u.uid, "socials"));
     if (socials.empty) { location.href = "social.html"; return; }
+
+    // make sure my public discovery copy exists / is current
+    const poolSnap = await getDoc(doc(db, "pool", u.uid));
+    if (!poolSnap.exists()) { try { await syncPool(db, u.uid); } catch (e) { console.error(e); } }
 
     const uni = findUniversityById(p.universityId);
     const labels = Object.fromEntries(INTERESTS);
@@ -39,14 +44,21 @@
         ${p.bio ? `<p class="muted" style="font-size:14px">${esc(p.bio)}</p>` : ""}
         <p style="margin-top:10px;font-size:14px">${chips.join("<br>")}</p>
       </div>
-      <p class="headline" style="font-size:20px;margin-top:24px">Day 3 done ✅</p>
-      <p class="muted" style="font-size:14px">Your profile is complete. Next: the FIND SOMEONE engine.</p>
+      <a class="btn find" href="discover.html">FIND SOMEONE</a>
+      <label class="check" style="margin-top:16px"><input type="checkbox" id="disc" ${p.discoverable ? "checked" : ""}><span>Show me to other students</span></label>
+      <p class="headline" style="font-size:18px;margin-top:20px">Day 4 done ✅</p>
       <div style="margin-top:16px">
         <a class="btn ghost" href="profile.html">Edit profile</a>
         <a class="btn ghost" href="avatar.html">Edit avatar</a>
         <a class="btn ghost" href="social.html">Edit links</a>
       </div>
       <div><button class="btn ghost" id="out" style="margin-top:12px">Log out</button></div>`;
+    document.getElementById("disc").onchange = async (e) => {
+      const on = e.target.checked; e.target.disabled = true;
+      try { await setDoc(doc(db, "users", u.uid), { discoverable: on, updatedAt: serverTimestamp() }, { merge: true }); await syncPool(db, u.uid); }
+      catch (er) { console.error(er); e.target.checked = !on; }
+      e.target.disabled = false;
+    };
     document.getElementById("out").onclick = async () => { await logout(); location.href = "index.html"; };
   });
 </script>

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Discover — FAF</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="center" style="justify-content:flex-start">
+  <div class="logo" style="font-size:44px">FAF</div>
+  <p class="headline" style="font-size:24px;margin-top:4px">Meet someone new.</p>
+  <p class="muted" style="font-size:14px">You never know who you've crossed paths with.</p>
+
+  <div id="stage">
+    <p class="lbl" style="text-align:left">WHERE DO YOU WANT TO DISCOVER?</p>
+    <div id="modes"></div>
+    <button class="btn find" id="find">FIND SOMEONE</button>
+    <p class="error" id="msg"></p>
+  </div>
+
+  <div id="result"></div>
+  <a class="link" href="home.html">← Back to profile</a>
+  <p><a class="link" id="reset" href="#" style="display:none;font-size:12px">Testing: reset my discovery history</a></p>
+</main>
+<script type="module">
+  import { db, watchUser } from "./firebase.js";
+  import { loadContext, findSomeone, resetHistory } from "./discover.js";
+  import { renderAvatar } from "./avatar.js";
+  import { INTERESTS, findUniversityById } from "./universities.js";
+  import { PLATFORMS, normalizeHandle, linkFor } from "./social.js";
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const MODES = [
+    ["university", "🏫", "MY UNIVERSITY", "Students from your university."],
+    ["other", "🎓", "OTHER UNIVERSITIES", "Students from universities across India."],
+    ["state", "📍", "MY STATE", "Students from universities in your state."],
+  ];
+  const LABELS = Object.fromEntries(INTERESTS);
+  const DAILY_LIMIT = 50;
+  let mode = localStorage.getItem("faf_mode") || "university", ctx = null, uid = null;
+
+  function drawModes() {
+    $("modes").innerHTML = MODES.map(([id, ic, t, d]) => `
+      <button type="button" class="mode ${mode === id ? "on" : ""}" data-m="${id}">
+        <span class="ic">${ic}</span><span><b>${t}</b><small>${d}</small></span></button>`).join("");
+  }
+  $("modes").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-m]"); if (!b) return;
+    mode = b.dataset.m; localStorage.setItem("faf_mode", mode); drawModes(); $("msg").innerHTML = "";
+  });
+
+  const todayKey = () => "faf_count_" + new Date().toISOString().slice(0, 10);
+
+  function showResult(p) {
+    const mine = new Set(ctx.me.interests || []);
+    const shared = (p.interests || []).filter((i) => mine.has(i));
+    const uni = findUniversityById(p.universityId);
+    const links = Object.entries(p.socials || {}).map(([plat, raw]) => {
+      const pl = PLATFORMS.find((x) => x.id === plat); const h = pl && normalizeHandle(plat, raw);
+      if (!h) return "";
+      const url = linkFor(plat, h);
+      return url
+        ? `<a class="btn soc" href="${url}" target="_blank" rel="noopener noreferrer">${pl.icon} ${pl.label}</a>`
+        : `<button class="btn soc" data-copy="${esc(h)}">${pl.icon} ${pl.label}: ${esc(h)} (tap to copy)</button>`;
+    }).join("");
+    $("stage").style.display = "none";
+    $("result").innerHTML = `
+      <p class="lbl" style="color:var(--violet)">YOU FOUND SOMEONE</p>
+      <div class="card" style="text-align:center">
+        <div class="preview">${renderAvatar(p.avatarConfig)}</div>
+        <b style="font-size:24px;margin-top:12px;color:var(--ink)">${esc(p.displayName)}, ${esc(p.age)}</b>
+        <span>${esc(p.collegeName)}<br>${esc(uni ? uni.name : "")}${uni ? " · " + esc(uni.state) : ""}</span>
+        <p style="margin-top:10px;font-size:15px">${(p.interests || []).map((i) => esc(LABELS[i] || i)).join(" · ")}</p>
+        ${shared.length ? `<p style="font-weight:700;color:var(--violet)">You both like ${shared.map((i) => esc((LABELS[i] || i))).join(", ")}</p>` : ""}
+        ${p.bio ? `<p class="muted" style="font-size:14px">${esc(p.bio)}</p>` : ""}
+        <p class="muted" style="font-size:14px">You might have crossed paths.</p>
+        <p class="lbl">CONNECT</p>${links || '<p class="muted">No links shared.</p>'}
+      </div>
+      <button class="btn find" id="again">FIND SOMEONE ELSE</button>`;
+    $("again").onclick = () => { $("result").innerHTML = ""; $("stage").style.display = ""; run(); };
+  }
+  $("result").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-copy]"); if (!b) return;
+    navigator.clipboard?.writeText(b.dataset.copy); b.textContent = "Copied ✓";
+  });
+
+  function showEmpty() {
+    const others = MODES.filter(([id]) => id !== mode).map(([id, ic, t]) => `<button class="btn ghost" data-switch="${id}" style="margin:6px 4px">${ic} ${t}</button>`).join("");
+    $("stage").style.display = "";
+    $("msg").style.color = "inherit";
+    $("msg").innerHTML = `<b>Looks like your discovery pool is a little small.</b><br><span class="muted">Try another discovery mode to meet more students.</span><br>${others}`;
+  }
+  $("msg").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-switch]"); if (!b) return;
+    mode = b.dataset.switch; localStorage.setItem("faf_mode", mode); drawModes(); $("msg").innerHTML = ""; run();
+  });
+
+  async function run() {
+    if (!ctx) return;
+    $("msg").innerHTML = "";
+    const n = Number(localStorage.getItem(todayKey()) || 0);
+    if (n >= DAILY_LIMIT) { $("msg").style.color = "inherit"; $("msg").textContent = "You've discovered a lot of people today. Come back later."; return; }
+    $("find").disabled = true; $("find").textContent = "Finding someone new...";
+    try {
+      const p = await findSomeone(db, ctx, mode);
+      localStorage.setItem(todayKey(), n + 1);
+      if (p) showResult(p); else showEmpty();
+    } catch (e) {
+      console.error(e);
+      $("msg").style.color = "#c0392b";
+      $("msg").textContent = e.code === "failed-precondition"
+        ? "Setting things up (the database index is building). Try again in a few minutes."
+        : "Something went wrong. Please try again.";
+    }
+    $("find").disabled = false; $("find").textContent = "FIND SOMEONE";
+  }
+  $("find").onclick = run;
+
+  if (location.search.includes("dev=1")) {
+    $("reset").style.display = "inline-block";
+    $("reset").onclick = async (e) => { e.preventDefault(); await resetHistory(db, uid); ctx = await loadContext(db, uid); $("msg").style.color = "inherit"; $("msg").textContent = "History reset."; };
+  }
+
+  watchUser(async (u) => {
+    if (!u) { location.href = "join.html"; return; }
+    uid = u.uid; ctx = await loadContext(db, uid);
+    if (!ctx.me.profileComplete) { location.href = "home.html"; return; }
+    drawModes();
+  });
+</script>
+</body>
+</html>

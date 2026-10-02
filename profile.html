@@ -44,6 +44,7 @@
   import { auth, db, watchUser } from "./firebase.js";
   import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
   import { UNIVERSITIES, INTERESTS, findUniversityByName, findUniversityById } from "./universities.js";
+  import { syncPool } from "./pool.js";
 
   const $ = (id) => document.getElementById(id);
   const selected = new Set();
@@ -122,6 +123,7 @@
       }
       if (existing.rand === undefined) data.rand = Math.random(); // hidden random key used by FIND SOMEONE (Day 4)
       await setDoc(doc(db, "users", uid), data, { merge: true });
+      await syncPool(db, uid);
       location.href = "home.html";
     } catch (e) {
       console.error(e);

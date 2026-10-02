@@ -38,3 +38,13 @@ input:focus, select:focus { outline:2px solid var(--violet); border-color:transp
 .tog { display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:rgba(20,18,43,.7); }
 .tog input { width:18px; height:18px; margin:0; accent-color:var(--violet); }
 .btn.ghost + .btn.ghost { margin-left:6px; }
+
+/* Day 4: discover */
+.mode { display:flex; align-items:center; gap:14px; width:100%; margin-top:10px; padding:14px 16px; background:#fff; border:2px solid transparent; border-radius:20px; text-align:left; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,.06); font:inherit; color:var(--ink); }
+.mode.on { border-color:var(--violet); background:#F4F0FF; }
+.mode .ic { font-size:28px; }
+.mode b { display:block; font-size:14px; }
+.mode small { color:rgba(20,18,43,.6); font-size:12px; }
+.btn.find { font-size:22px; padding:20px; margin-top:24px; letter-spacing:.5px; }
+.btn.find:disabled { opacity:.6; }
+.btn.soc { background:var(--ink); box-shadow:none; font-size:16px; padding:12px; margin-top:10px; }
