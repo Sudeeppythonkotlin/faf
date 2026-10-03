@@ -26,19 +26,24 @@
 </main>
 <script type="module">
   import { db, watchUser } from "./firebase.js";
-  import { doc, getDoc, getDocs, setDoc, collection, query, where, orderBy, limit, serverTimestamp, Timestamp }
+  import { doc, getDoc, getDocs, setDoc, collection, query, where, orderBy, limit, serverTimestamp, Timestamp, increment }
     from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
   import { findUniversityById } from "./universities.js";
   import { renderAvatar } from "./avatar.js";
   import { PLATFORMS, normalizeHandle, linkFor } from "./social.js";
   import { syncPool } from "./pool.js";
   import { esc, LABELS, mountNav } from "./ui.js";
+  import { track } from "./analytics.js";
+  import { adHtml, mountAd } from "./ads.js";
 
   mountNav("home");
   const COOLDOWN_DAYS = 30;
+  const DAILY_LIMIT = 40; // max FIND SOMEONE presses per day (soft limit)
+  const dayKey = () => new Date().toLocaleDateString("en-CA");
+  const MODE_COUNTER = { university: "mUniversity", other: "mOther", state: "mState" };
   const $ = (id) => document.getElementById(id);
   let uid = null, me = {}, mode = "university";
-  let seen = new Set(), blocked = new Set();
+  let seen = new Set(), usedToday = 0, shownCount = 0, hasResult = false;
 
   $("modes").addEventListener("click", (e) => { const b = e.target.closest(".mode"); if (b) setMode(b.dataset.m); });
   function setMode(m) { mode = m; document.querySelectorAll(".mode").forEach((x) => x.classList.toggle("on", x.dataset.m === m)); }
@@ -48,12 +53,16 @@
     uid = u.uid;
     const snap = await getDoc(doc(db, "users", uid));
     me = snap.exists() ? snap.data() : {};
+    if (me.accountStatus && me.accountStatus !== "active") {
+      $("find").style.display = "none"; $("modes").style.display = "none";
+      $("out").innerHTML = `<div class="card"><b>Your account is not active.</b><span>Please contact us if you think this is a mistake.</span></div>`;
+      return;
+    }
     if (!me.universityId) { location.href = "profile.html"; return; }
     if (!me.avatarConfig) { location.href = "avatar.html"; return; }
     const socials = await getDocs(collection(db, "users", uid, "socials"));
     if (socials.empty) { location.href = "social.html"; return; }
 
-    // keep my public discovery card up to date
     const socialDocs = []; socials.forEach((d) => socialDocs.push({ id: d.id, data: d.data() }));
     try { await syncPool(db, uid, me, socialDocs); } catch (e) { console.error("pool sync failed", e); }
 
@@ -64,11 +73,11 @@
   });
 
   async function loadContext() {
-    seen = new Set(); blocked = new Set();
+    seen = new Set();
     const s = await getDocs(query(collection(db, "users", uid, "seen"), where("expiresAt", ">", Timestamp.now())));
     s.forEach((d) => seen.add(d.id));
-    (await getDocs(collection(db, "users", uid, "blocks"))).forEach((d) => blocked.add(d.id));
-    (await getDocs(collection(db, "users", uid, "blockedBy"))).forEach((d) => blocked.add(d.id));
+    const us = await getDoc(doc(db, "users", uid, "usage", dayKey()));
+    usedToday = us.exists() ? (us.data().count || 0) : 0;
   }
 
   async function fetchBatch(r, up) {
@@ -90,7 +99,7 @@
   }
 
   function eligible(c) {
-    if (c.id === uid || seen.has(c.id) || blocked.has(c.id)) return false;
+    if (c.id === uid || seen.has(c.id)) return false;
     const d = c.data(); if (!(d.age >= 18)) return false;
     if (mode === "university") return d.universityId === me.universityId;
     if (mode === "state") return d.stateId === me.stateId;
@@ -99,22 +108,28 @@
 
   async function findSomeone() {
     if (me.discoverable === false) return;
+    if (usedToday >= DAILY_LIMIT) { $("out").innerHTML = `<p class="muted" style="margin-top:16px">You've discovered a lot of people today. Come back later.</p>`; return; }
+    usedToday++;
+    setDoc(doc(db, "users", uid, "usage", dayKey()), { count: increment(1) }, { merge: true }).catch(() => {});
+    track("find_someone_clicked", hasResult ? ["finds", MODE_COUNTER[mode], "elseClicks"] : ["finds", MODE_COUNTER[mode]], { mode });
     $("find").disabled = true; $("find").textContent = "Finding someone new...";
     $("out").innerHTML = `<div class="spin"></div>`;
     try {
       const r = Math.random();
       let pool = (await fetchBatch(r, true)).filter(eligible);
       if (!pool.length) pool = (await fetchBatch(r, false)).filter(eligible);
-      if (!pool.length) { showEmpty(); return; }
+      if (!pool.length) { hasResult = false; track("discovery_empty", ["empty"], { mode }); showEmpty(); return; }
       const pick = pool[Math.floor(Math.random() * pool.length)];
       await setDoc(doc(db, "users", uid, "seen", pick.id), { at: serverTimestamp(), expiresAt: Timestamp.fromMillis(Date.now() + COOLDOWN_DAYS * 864e5) });
       seen.add(pick.id);
+      hasResult = true; shownCount++;
+      track("discovery_success", ["success"], { mode });
       showResult(pick.data());
     } catch (e) {
       console.error(e);
       $("out").innerHTML = `<p class="error">Something went wrong. Please try again.</p>`;
     } finally {
-      $("find").disabled = false; $("find").textContent = "FIND SOMEONE ELSE";
+      $("find").disabled = false; $("find").textContent = hasResult ? "FIND SOMEONE ELSE" : "FIND SOMEONE";
     }
   }
   $("find").onclick = findSomeone;
@@ -161,13 +176,15 @@
         <span>${esc(d.collegeName)}<br>${esc(uni ? uni.name : "")}${uni ? " · " + esc(uni.state) : ""}</span>
         <p style="margin-top:10px;font-size:14px">${theirs.map((i) => esc(LABELS[i])).join(" · ")}</p>
         ${shared.length ? `<p style="font-size:14px;color:var(--violet);font-weight:700">You both like ${shared.map((i) => esc(LABELS[i])).join(", ")}</p>` : ""}
-        ${d.bio ? `<p class="muted" style="font-size:14px">${esc(d.bio)}</p>` : ""}
         <p class="muted" style="font-size:13px">You might have crossed paths.</p>
         <p class="lbl" style="margin-top:14px">CONNECT</p>
-        <div>${links || '<span class="muted" style="font-size:13px">No links shared.</span>'}</div>
+        <div id="conns">${links || '<span class="muted" style="font-size:13px">No links shared.</span>'}</div>
       </div>
-      <button class="btn ghost" id="share" style="margin-top:14px">📣 Share FAF</button>`;
+      <button class="btn ghost" id="share" style="margin-top:14px">📣 Share FAF</button>
+      ${shownCount % 3 === 0 ? adHtml() : ""}`;
     $("share").onclick = () => share();
+    $("conns").onclick = (e) => { if (e.target.closest(".conn")) track("external_social_clicked", ["connectClicks"]); };
+    if (shownCount % 3 === 0) mountAd();
     $("out").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 </script>

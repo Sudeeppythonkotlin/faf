@@ -11,7 +11,7 @@ export async function syncPool(db, uid, p, socialDocs) {
   await setDoc(ref, {
     displayName: p.displayName, age: p.age, collegeName: p.collegeName,
     universityId: p.universityId, stateId: p.stateId,
-    interests: p.interests || [], avatarConfig: p.avatarConfig, bio: p.bio || "",
+    interests: p.interests || [], avatarConfig: p.avatarConfig,
     socials, rand: typeof p.rand === "number" ? p.rand : Math.random(),
     updatedAt: serverTimestamp(),
   });

@@ -25,7 +25,6 @@ export function myCardHtml(p, socialDocs) {
       <b style="margin-top:10px;font-size:20px">${esc(p.displayName)}, ${esc(p.age)}</b>
       <span>${esc(p.collegeName)}<br>${esc(uni ? uni.name : "")}${uni ? " · " + esc(uni.state) : ""}</span>
       <p style="margin-top:10px;font-size:14px">${(p.interests || []).map((i) => esc(LABELS[i] || i)).join(" · ")}</p>
-      ${p.bio ? `<p class="muted" style="font-size:14px">${esc(p.bio)}</p>` : ""}
       <p style="margin-top:10px;font-size:14px">${chips.join("<br>")}</p>
     </div>`;
 }

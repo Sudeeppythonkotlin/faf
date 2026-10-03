@@ -72,3 +72,22 @@ input:focus, select:focus { outline:2px solid var(--violet); border-color:transp
 .bnav a span { display:block; font-size:20px; }
 .bnav a.on { color:var(--violet); background:#F3EFFF; }
 .list a { display:block; background:#fff; border-radius:16px; padding:16px; margin-top:10px; text-align:left; text-decoration:none; color:var(--ink); font-weight:600; }
+
+/* Day 6: safety + settings */
+.safety { margin-top:12px; font-size:13px; color:rgba(20,18,43,.5); }
+.linkbtn { background:none; border:0; padding:4px 2px; font:inherit; font-size:13px; color:rgba(20,18,43,.6); cursor:pointer; text-decoration:underline; }
+.switchrow { display:flex; justify-content:space-between; align-items:center; gap:14px; }
+.switchrow > span { display:block; }
+.switchrow span span { display:block; font-weight:400; font-size:13px; color:rgba(20,18,43,.6); margin-top:2px; }
+.switchrow input { width:24px; height:24px; flex:none; margin:0; accent-color:var(--violet); }
+.card.danger { border:1px solid rgba(192,57,43,.3); margin-top:22px; }
+.legal h2 { margin-top:28px; font-size:22px; }
+.legal p, .legal li { font-size:14px; line-height:1.55; margin-top:8px; color:rgba(20,18,43,.8); }
+.legal ul { padding-left:20px; }
+
+/* Day 7: admin + ads */
+.ah { margin:22px 0 6px; font-size:16px; }
+.tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.tbl td, .tbl th { padding:6px 4px; text-align:left; border-bottom:1px solid rgba(20,18,43,.08); white-space:nowrap; }
+.adbox { margin-top:18px; padding:8px; border:1px dashed rgba(20,18,43,.15); border-radius:14px; text-align:center; }
+.adbox p { font-size:10px; color:rgba(20,18,43,.45); margin:0 0 4px; letter-spacing:1px; text-transform:uppercase; }

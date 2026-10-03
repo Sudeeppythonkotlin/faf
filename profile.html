@@ -34,9 +34,6 @@
   <label class="lbl">Interests <span class="hint">(pick up to 8)</span></label>
   <div id="chips" class="chips"></div>
 
-  <label class="lbl">Short bio <span class="hint">(optional, 100 characters)</span></label>
-  <input id="bio" maxlength="100" placeholder="Say something fun">
-
   <button class="btn" id="save">Save profile</button>
   <p class="error" id="err"></p>
 </main>
@@ -44,7 +41,6 @@
   import { auth, db, watchUser } from "./firebase.js";
   import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
   import { UNIVERSITIES, INTERESTS, findUniversityByName, findUniversityById } from "./universities.js";
-  import { syncPool } from "./pool.js";
 
   const $ = (id) => document.getElementById(id);
   const selected = new Set();
@@ -91,7 +87,6 @@
       selected.add(id);
       const b = document.querySelector(`.chip[data-id="${id}"]`); if (b) b.classList.add("on");
     });
-    $("bio").value = existing.bio || "";
   });
 
   $("save").addEventListener("click", async () => {
@@ -113,7 +108,7 @@
       const data = {
         displayName: name, dateOfBirth: dob, age, gender,
         collegeName: college, universityId: uni.id, stateId: uni.stateId,
-        interests: [...selected], bio: $("bio").value.trim(),
+        interests: [...selected],
         updatedAt: serverTimestamp(),
       };
       if (!docExists) {
@@ -123,7 +118,6 @@
       }
       if (existing.rand === undefined) data.rand = Math.random(); // hidden random key used by FIND SOMEONE (Day 4)
       await setDoc(doc(db, "users", uid), data, { merge: true });
-      await syncPool(db, uid);
       location.href = "home.html";
     } catch (e) {
       console.error(e);

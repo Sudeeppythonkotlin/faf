@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin — FAF</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main style="justify-content:flex-start">
+  <a href="settings.html" class="logo" style="font-size:36px;text-decoration:none">FAF</a>
+  <p class="headline" style="font-size:22px">Admin</p>
+  <div id="app"><p class="muted">Checking access...</p></div>
+</main>
+<script type="module">
+  import { db, watchUser } from "./firebase.js";
+  import { doc, getDoc, getDocs, setDoc, deleteDoc, collection, query, where, limit, getCountFromServer, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+  import { findUniversityById } from "./universities.js";
+  import { dayId } from "./analytics.js";
+  import { esc } from "./ui.js";
+
+  const $ = (id) => document.getElementById(id);
+  const count = async (q) => (await getCountFromServer(q)).data().count;
+
+  watchUser(async (u) => {
+    if (!u) { location.href = "join.html"; return; }
+    let ok = false;
+    try { ok = (await getDoc(doc(db, "admins", u.uid))).exists(); } catch (e) {}
+    if (!ok) { $("app").innerHTML = `<p class="muted">Not authorised.</p>`; return; }
+    render();
+  });
+
+  async function render() {
+    $("app").innerHTML = `
+      <h3 class="ah">Users</h3><div id="users" class="card"><span>Loading...</span></div>
+      <h3 class="ah">Discovery (last 7 days)</h3><div id="disc" class="card" style="overflow-x:auto"><span>Loading...</span></div>
+      <h3 class="ah">Universities</h3><div class="card"><button class="btn ghost" id="loadU">Load breakdown</button><div id="uni"></div></div>
+      <h3 class="ah">Manage a user</h3>
+      <div class="card"><span>Find by exact display name, or paste a user ID.</span>
+        <input id="q" placeholder="Name or user ID"><button class="btn ghost" id="find" style="margin-top:10px">Find</button>
+        <div id="found"></div></div>`;
+    loadUsers(); loadDisc();
+    $("loadU").onclick = loadUnis; $("find").onclick = findUser;
+  }
+
+  async function loadUsers() {
+    try {
+      const [total, complete, visible] = await Promise.all([
+        count(collection(db, "users")),
+        count(query(collection(db, "users"), where("profileComplete", "==", true))),
+        count(collection(db, "pool")),
+      ]);
+      $("users").innerHTML = `<table class="tbl"><tr><td>Total accounts</td><td>${total}</td></tr><tr><td>Completed profiles</td><td>${complete}</td></tr><tr><td>Visible in discovery</td><td>${visible}</td></tr></table>`;
+    } catch (e) { console.error(e); $("users").innerHTML = `<span class="error">Could not load. Check the rules are published.</span>`; }
+  }
+
+  async function loadDisc() {
+    const days = []; for (let i = 0; i < 7; i++) days.push(dayId(new Date(Date.now() - i * 864e5)));
+    try {
+      const snaps = await Promise.all(days.map((d) => getDoc(doc(db, "stats", d))));
+      const rows = snaps.map((s, i) => ({ day: days[i], ...(s.exists() ? s.data() : {}) }));
+      const n = (v) => v || 0;
+      $("disc").innerHTML = `<table class="tbl"><tr><th>Day</th><th>Presses</th><th>Found</th><th>Empty</th><th>"Else"</th><th>Connect</th><th>Univ</th><th>Other</th><th>State</th></tr>` +
+        rows.map((r) => `<tr><td>${r.day.slice(5)}</td><td>${n(r.finds)}</td><td>${n(r.success)}</td><td>${n(r.empty)}</td><td>${n(r.elseClicks)}</td><td>${n(r.connectClicks)}</td><td>${n(r.mUniversity)}</td><td>${n(r.mOther)}</td><td>${n(r.mState)}</td></tr>`).join("") + `</table>`;
+      const t = rows.reduce((a, r) => ({ s: a.s + n(r.success), e: a.e + n(r.elseClicks), c: a.c + n(r.connectClicks) }), { s: 0, e: 0, c: 0 });
+      $("disc").innerHTML += `<p class="hint">"Else" rate (people who pressed again after a result): <b>${t.s ? Math.round((t.e / t.s) * 100) : 0}%</b> · Connect clicks per result: <b>${t.s ? Math.round((t.c / t.s) * 100) : 0}%</b></p>`;
+    } catch (e) { console.error(e); $("disc").innerHTML = `<span class="error">Could not load stats.</span>`; }
+  }
+
+  async function loadUnis() {
+    $("uni").innerHTML = `<p class="hint">Loading...</p>`;
+    const snap = await getDocs(collection(db, "pool"));
+    const byU = {}, byS = {};
+    snap.forEach((d) => { const x = d.data(); byU[x.universityId] = (byU[x.universityId] || 0) + 1; byS[x.stateId] = (byS[x.stateId] || 0) + 1; });
+    const top = Object.entries(byU).sort((a, b) => b[1] - a[1]);
+    $("uni").innerHTML = `<p class="hint">${top.length} universities have at least one visible student.</p><table class="tbl">` +
+      top.slice(0, 25).map(([id, n]) => { const u = findUniversityById(id); return `<tr><td>${esc(u ? u.name : id)}</td><td>${n}</td></tr>`; }).join("") +
+      `</table><p class="hint">By state: ${Object.entries(byS).sort((a, b) => b[1] - a[1]).map(([s, n]) => esc(s) + " " + n).join(" · ")}</p>`;
+  }
+
+  async function findUser() {
+    const q = $("q").value.trim(); if (!q) return;
+    $("found").innerHTML = `<p class="hint">Searching...</p>`;
+    const hits = [];
+    const byName = await getDocs(query(collection(db, "pool"), where("displayName", "==", q), limit(10)));
+    byName.forEach((d) => hits.push({ id: d.id, name: d.data().displayName, college: d.data().collegeName }));
+    if (!hits.length) {
+      const u = await getDoc(doc(db, "users", q));
+      if (u.exists()) hits.push({ id: q, name: u.data().displayName, college: u.data().collegeName });
+    }
+    if (!hits.length) { $("found").innerHTML = `<p class="hint">No match. (Hidden users only appear by user ID.)</p>`; return; }
+    const rows = [];
+    for (const h of hits) {
+      const u = await getDoc(doc(db, "users", h.id));
+      rows.push(`<div class="card" style="margin-top:8px">
+        <b style="color:var(--ink)">${esc(h.name)}</b><span>${esc(h.college)}<br>ID: ${esc(h.id)}<br>Status: <b>${esc(u.exists() ? u.data().accountStatus : "unknown")}</b></span>
+        <div style="margin-top:8px">
+          <button class="btn ghost" data-act="suspended" data-id="${esc(h.id)}">Suspend</button>
+          <button class="btn ghost" data-act="banned" data-id="${esc(h.id)}">Ban</button>
+          <button class="btn ghost" data-act="active" data-id="${esc(h.id)}">Restore</button></div></div>`);
+    }
+    $("found").innerHTML = rows.join("");
+    $("found").querySelectorAll("[data-act]").forEach((b) => b.onclick = async () => {
+      const id = b.dataset.id, act = b.dataset.act;
+      if (!confirm(`Set this account to "${act}"?`)) return;
+      try {
+        await setDoc(doc(db, "users", id), { accountStatus: act, updatedAt: serverTimestamp() }, { merge: true });
+        if (act !== "active") await deleteDoc(doc(db, "pool", id)); // remove from discovery now
+        alert("Done: " + act + (act === "active" ? ". They reappear the next time they open FAF." : ""));
+        findUser();
+      } catch (e) { console.error(e); alert("Failed. Check that the rules are published."); }
+    });
+  }
+</script>
+</body>
+</html>

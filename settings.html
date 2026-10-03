@@ -11,6 +11,15 @@
 <main class="center" style="justify-content:flex-start">
   <div class="logo" style="font-size:36px">FAF</div>
   <p class="headline" style="font-size:22px;margin-bottom:14px">Settings</p>
+
+  <div class="card" style="margin-top:0">
+    <label class="switchrow">
+      <span><b style="color:var(--ink)">Show me to other students</b><span>When off, nobody can discover you. You can't discover others either.</span></span>
+      <input type="checkbox" id="disc" disabled>
+    </label>
+    <p class="hint" id="discMsg"></p>
+  </div>
+
   <div class="list">
     <a href="profile.html">✏️ Edit profile</a>
     <a href="avatar.html">🙂 Edit avatar</a>
@@ -18,15 +27,76 @@
     <a href="legal.html#safety">🛡️ Safety</a>
     <a href="legal.html#privacy">🔒 Privacy Policy</a>
     <a href="legal.html#terms">📄 Terms</a>
+    <a href="admin.html" id="adminLink" style="display:none">🛠️ Admin</a>
     <a href="#" id="out">🚪 Log out</a>
+  </div>
+
+  <div class="card danger">
+    <b style="color:#c0392b">Delete account</b>
+    <span>Permanently deletes your profile, avatar, links and history. This cannot be undone.</span>
+    <button class="btn ghost" id="del" style="margin-top:10px;color:#c0392b;border-color:#c0392b">Delete my account</button>
+    <p class="error" id="delErr"></p>
   </div>
 </main>
 <script type="module">
-  import { watchUser, logout } from "./firebase.js";
+  import { auth, db, watchUser, logout } from "./firebase.js";
+  import { doc, getDoc, getDocs, setDoc, deleteDoc, collection, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+  import { GoogleAuthProvider, reauthenticateWithPopup, deleteUser }
+    from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
+  import { syncPool } from "./pool.js";
   import { mountNav } from "./ui.js";
+
   mountNav("settings");
-  watchUser((u) => { if (!u) location.href = "join.html"; });
-  document.getElementById("out").onclick = async (e) => { e.preventDefault(); await logout(); location.href = "index.html"; };
+  const $ = (id) => document.getElementById(id);
+  let uid = null, me = {}, socialDocs = [];
+
+  watchUser(async (u) => {
+    if (!u) { location.href = "join.html"; return; }
+    uid = u.uid;
+    const snap = await getDoc(doc(db, "users", uid));
+    me = snap.exists() ? snap.data() : {};
+    const s = await getDocs(collection(db, "users", uid, "socials"));
+    socialDocs = []; s.forEach((d) => socialDocs.push({ id: d.id, data: d.data() }));
+    $("disc").checked = me.discoverable === true;
+    $("disc").disabled = !me.profileComplete;
+    if (!me.profileComplete) $("discMsg").textContent = "Finish your profile first (avatar and social links).";
+    try { const a = await getDoc(doc(db, "admins", uid)); if (a.exists()) $("adminLink").style.display = "block"; } catch (e) {}
+  });
+
+  $("disc").onchange = async () => {
+    const on = $("disc").checked; $("disc").disabled = true; $("discMsg").textContent = "Saving...";
+    try {
+      await setDoc(doc(db, "users", uid), { discoverable: on, updatedAt: serverTimestamp() }, { merge: true });
+      me.discoverable = on;
+      await syncPool(db, uid, me, socialDocs);
+      $("discMsg").textContent = on ? "You are visible to other students." : "You are hidden.";
+    } catch (e) { console.error(e); $("disc").checked = !on; $("discMsg").textContent = "Could not save. Please try again."; }
+    $("disc").disabled = false;
+  };
+
+  $("out").onclick = async (e) => { e.preventDefault(); await logout(); location.href = "index.html"; };
+
+  $("del").onclick = async () => {
+    const err = $("delErr"); err.textContent = "";
+    if (prompt("This permanently deletes your FAF account.\nType DELETE to confirm.") !== "DELETE") return;
+    $("del").disabled = true; $("del").textContent = "Deleting...";
+    try {
+      await reauthenticateWithPopup(auth.currentUser, new GoogleAuthProvider());
+      await deleteDoc(doc(db, "pool", uid)); // stop being discoverable immediately
+      for (const sub of ["socials", "seen", "usage"]) {
+        const snap = await getDocs(collection(db, "users", uid, sub));
+        for (const d of snap.docs) await deleteDoc(d.ref);
+      }
+      await deleteDoc(doc(db, "users", uid));
+      await deleteUser(auth.currentUser);
+      location.href = "index.html";
+    } catch (e) {
+      console.error(e);
+      err.textContent = e.code === "auth/popup-closed-by-user" ? "Deletion cancelled." : "Could not delete the account. Please try again.";
+      $("del").disabled = false; $("del").textContent = "Delete my account";
+    }
+  };
 </script>
 </body>
 </html>

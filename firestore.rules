@@ -2,50 +2,79 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ---- Private account data: owner only ----
+    function signedIn() { return request.auth != null; }
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // ---- Private account data: owner only (admins can read and set status) ----
     match /users/{uid} {
-      allow get: if request.auth != null && request.auth.uid == uid;
-      allow list: if false;
-      allow create: if request.auth != null && request.auth.uid == uid
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create: if signedIn() && request.auth.uid == uid
         && request.resource.data.ageConfirmed == true
         && request.resource.data.accountStatus == 'active';
-      allow update: if request.auth != null && request.auth.uid == uid
+      allow update: if (signedIn() && request.auth.uid == uid
         && request.resource.data.accountStatus == resource.data.accountStatus
         && request.resource.data.ageConfirmed == true
         && (!('age' in request.resource.data) || request.resource.data.age >= 18)
-        && (!('bio' in request.resource.data) || request.resource.data.bio.size() <= 100)
-        && (!('interests' in request.resource.data) || request.resource.data.interests.size() <= 8);
-      allow delete: if false;
+        && (!('interests' in request.resource.data) || request.resource.data.interests.size() <= 8))
+        || isAdmin();
+      allow delete: if signedIn() && request.auth.uid == uid;
 
       match /socials/{platform} {
-        allow read, delete: if request.auth != null && request.auth.uid == uid;
-        allow create, update: if request.auth != null && request.auth.uid == uid
+        allow read, delete: if signedIn() && request.auth.uid == uid;
+        allow create, update: if signedIn() && request.auth.uid == uid
           && platform in ['instagram', 'snapchat', 'linkedin', 'discord']
           && request.resource.data.handle is string
           && request.resource.data.handle.size() <= 100
           && request.resource.data.visible is bool;
       }
-      // discovery history (30-day cooldown) and my block list: owner only
-      match /seen/{other} { allow read, write: if request.auth != null && request.auth.uid == uid; }
-      match /blocks/{other} { allow read, write: if request.auth != null && request.auth.uid == uid; }
-      // "someone blocked me" markers: anyone signed in can add/remove only THEIR OWN marker; I can read mine
-      match /blockedBy/{blocker} {
-        allow read: if request.auth != null && request.auth.uid == uid;
-        allow create, delete: if request.auth != null && request.auth.uid == blocker;
+      match /seen/{other} { allow read, write: if signedIn() && request.auth.uid == uid; }
+      match /usage/{day} {
+        allow read, delete: if signedIn() && request.auth.uid == uid;
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.count is int && request.resource.data.count >= 0 && request.resource.data.count <= 100000;
       }
     }
 
-    // ---- Public discovery cards: what other students may see ----
+    // ---- Public discovery cards ----
     match /pool/{uid} {
-      allow get: if request.auth != null;
-      // lists must be small (max 60 cards per query)
-      allow list: if request.auth != null && request.query.limit <= 60;
-      allow create, update: if request.auth != null && request.auth.uid == uid
+      allow get: if signedIn();
+      allow list: if signedIn() && (isAdmin() || request.query.limit <= 60);
+      allow create, update: if signedIn() && request.auth.uid == uid
         && get(/databases/$(database)/documents/users/$(uid)).data.accountStatus == 'active'
         && get(/databases/$(database)/documents/users/$(uid)).data.discoverable == true
         && request.resource.data.age >= 18
-        && request.resource.data.keys().hasOnly(['displayName','age','collegeName','universityId','stateId','interests','avatarConfig','bio','socials','rand','updatedAt']);
-      allow delete: if request.auth != null && request.auth.uid == uid;
+        && request.resource.data.keys().hasOnly(['displayName','age','collegeName','universityId','stateId','interests','avatarConfig','socials','rand','updatedAt']);
+      allow delete: if signedIn() && (request.auth.uid == uid || isAdmin());
+    }
+
+    // ---- Combined daily counters (anonymous). Anyone signed in may add +1 to a counter; only admins can read. ----
+    match /stats/{day} {
+      allow read: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['finds','success','empty','elseClicks','connectClicks','mUniversity','mOther','mState'])
+        && request.resource.data.get('finds', 0) <= 1 && request.resource.data.get('success', 0) <= 1
+        && request.resource.data.get('empty', 0) <= 1 && request.resource.data.get('elseClicks', 0) <= 1
+        && request.resource.data.get('connectClicks', 0) <= 1 && request.resource.data.get('mUniversity', 0) <= 1
+        && request.resource.data.get('mOther', 0) <= 1 && request.resource.data.get('mState', 0) <= 1;
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['finds','success','empty','elseClicks','connectClicks','mUniversity','mOther','mState'])
+        && request.resource.data.get('finds', 0) - resource.data.get('finds', 0) <= 1
+        && request.resource.data.get('success', 0) - resource.data.get('success', 0) <= 1
+        && request.resource.data.get('empty', 0) - resource.data.get('empty', 0) <= 1
+        && request.resource.data.get('elseClicks', 0) - resource.data.get('elseClicks', 0) <= 1
+        && request.resource.data.get('connectClicks', 0) - resource.data.get('connectClicks', 0) <= 1
+        && request.resource.data.get('mUniversity', 0) - resource.data.get('mUniversity', 0) <= 1
+        && request.resource.data.get('mOther', 0) - resource.data.get('mOther', 0) <= 1
+        && request.resource.data.get('mState', 0) - resource.data.get('mState', 0) <= 1;
+    }
+
+    // ---- Admin list: you can only check whether YOU are an admin; added by hand in the console ----
+    match /admins/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
     }
 
     match /{document=**} { allow read, write: if false; }
