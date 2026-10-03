@@ -4,55 +4,172 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FAF</title>
+  <meta name="theme-color" content="#6C47FF">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main class="center" id="app"><p class="muted">Loading...</p></main>
+<main class="center" style="justify-content:flex-start">
+  <div class="logo" style="font-size:44px">FAF</div>
+  <p class="headline" style="font-size:26px;margin-top:6px">Meet someone new.</p>
+  <p class="muted" style="font-size:14px">You never know who you've crossed paths with.</p>
+
+  <p class="lbl" style="margin-top:22px;text-align:left">WHERE DO YOU WANT TO DISCOVER?</p>
+  <div class="modes" id="modes">
+    <button class="mode on" data-m="university"><span>🏫</span><b>MY UNIVERSITY</b><i>Students from your university.</i></button>
+    <button class="mode" data-m="other"><span>🎓</span><b>OTHER UNIVERSITIES</b><i>Students from universities across India.</i></button>
+    <button class="mode" data-m="state"><span>📍</span><b>MY STATE</b><i>Students from universities in your state.</i></button>
+  </div>
+  <button class="btn big" id="find" disabled>FIND SOMEONE</button>
+  <div id="out"><p class="muted" style="margin-top:20px">Loading...</p></div>
+</main>
 <script type="module">
-  import { db, watchUser, logout } from "./firebase.js";
-  import { doc, getDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
-  import { findUniversityById, INTERESTS } from "./universities.js";
+  import { db, watchUser } from "./firebase.js";
+  import { doc, getDoc, getDocs, setDoc, collection, query, where, orderBy, limit, serverTimestamp, Timestamp }
+    from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+  import { findUniversityById } from "./universities.js";
   import { renderAvatar } from "./avatar.js";
-  import { PLATFORMS } from "./social.js";
+  import { PLATFORMS, normalizeHandle, linkFor } from "./social.js";
   import { syncPool } from "./pool.js";
-  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  import { esc, LABELS, mountNav } from "./ui.js";
+
+  mountNav("home");
+  const COOLDOWN_DAYS = 30;
+  const $ = (id) => document.getElementById(id);
+  let uid = null, me = {}, mode = "university";
+  let seen = new Set(), blocked = new Set();
+
+  $("modes").addEventListener("click", (e) => { const b = e.target.closest(".mode"); if (b) setMode(b.dataset.m); });
+  function setMode(m) { mode = m; document.querySelectorAll(".mode").forEach((x) => x.classList.toggle("on", x.dataset.m === m)); }
 
   watchUser(async (u) => {
     if (!u) { location.href = "join.html"; return; }
-    const snap = await getDoc(doc(db, "users", u.uid));
-    const p = snap.exists() ? snap.data() : {};
-    if (!p.universityId) { location.href = "profile.html"; return; }
-    if (!p.avatarConfig) { location.href = "avatar.html"; return; }
-    const socials = await getDocs(collection(db, "users", u.uid, "socials"));
+    uid = u.uid;
+    const snap = await getDoc(doc(db, "users", uid));
+    me = snap.exists() ? snap.data() : {};
+    if (!me.universityId) { location.href = "profile.html"; return; }
+    if (!me.avatarConfig) { location.href = "avatar.html"; return; }
+    const socials = await getDocs(collection(db, "users", uid, "socials"));
     if (socials.empty) { location.href = "social.html"; return; }
 
     // keep my public discovery card up to date
     const socialDocs = []; socials.forEach((d) => socialDocs.push({ id: d.id, data: d.data() }));
-    try { await syncPool(db, u.uid, p, socialDocs); } catch (e) { console.error("pool sync failed", e); }
+    try { await syncPool(db, uid, me, socialDocs); } catch (e) { console.error("pool sync failed", e); }
 
-    const uni = findUniversityById(p.universityId);
-    const labels = Object.fromEntries(INTERESTS);
-    const chips = socialDocs.map((d) => { const pl = PLATFORMS.find((x) => x.id === d.id); return pl ? `${pl.icon} ${pl.label}${d.data.visible === false ? " (hidden)" : ""}` : ""; });
-
-    document.getElementById("app").innerHTML = `
-      <div class="logo" style="font-size:48px">FAF</div>
-      <a class="btn" href="discover.html" style="margin-top:12px">FIND SOMEONE</a>
-      <div class="card" style="text-align:center;margin-top:24px">
-        <div class="preview sm">${renderAvatar(p.avatarConfig)}</div>
-        <b style="margin-top:10px">${esc(p.displayName)}, ${esc(p.age)}</b>
-        <span>${esc(p.collegeName)}<br>${esc(uni ? uni.name : "")}${uni ? " · " + esc(uni.state) : ""}</span>
-        <p style="margin-top:10px;font-size:14px">${(p.interests || []).map((i) => esc(labels[i] || i)).join(" · ")}</p>
-        ${p.bio ? `<p class="muted" style="font-size:14px">${esc(p.bio)}</p>` : ""}
-        <p style="margin-top:10px;font-size:14px">${chips.join("<br>")}</p>
-      </div>
-      <div style="margin-top:16px">
-        <a class="btn ghost" href="profile.html">Edit profile</a>
-        <a class="btn ghost" href="avatar.html">Edit avatar</a>
-        <a class="btn ghost" href="social.html">Edit links</a>
-      </div>
-      <div><button class="btn ghost" id="out" style="margin-top:12px">Log out</button></div>`;
-    document.getElementById("out").onclick = async () => { await logout(); location.href = "index.html"; };
+    $("out").innerHTML = me.discoverable === false
+      ? `<p class="muted" style="margin-top:16px">You're hidden right now, so you can't discover people either. Turn "Show me" back on in Settings.</p>` : "";
+    await loadContext();
+    $("find").disabled = false;
   });
+
+  async function loadContext() {
+    seen = new Set(); blocked = new Set();
+    const s = await getDocs(query(collection(db, "users", uid, "seen"), where("expiresAt", ">", Timestamp.now())));
+    s.forEach((d) => seen.add(d.id));
+    (await getDocs(collection(db, "users", uid, "blocks"))).forEach((d) => blocked.add(d.id));
+    (await getDocs(collection(db, "users", uid, "blockedBy"))).forEach((d) => blocked.add(d.id));
+  }
+
+  async function fetchBatch(r, up) {
+    const base = collection(db, "pool");
+    const field = mode === "state" ? "stateId" : "universityId";
+    const val = mode === "state" ? me.stateId : me.universityId;
+    try {
+      const q = mode === "other"
+        ? query(base, where("rand", up ? ">=" : "<", r), orderBy("rand"), limit(60))
+        : query(base, where(field, "==", val), where("rand", up ? ">=" : "<", r), orderBy("rand"), limit(40));
+      return (await getDocs(q)).docs;
+    } catch (e) {
+      if (e.code === "failed-precondition") {
+        console.warn("Create the index using this link:", e.message);
+        return (await getDocs(query(base, where(field, "==", val), limit(60)))).docs;
+      }
+      throw e;
+    }
+  }
+
+  function eligible(c) {
+    if (c.id === uid || seen.has(c.id) || blocked.has(c.id)) return false;
+    const d = c.data(); if (!(d.age >= 18)) return false;
+    if (mode === "university") return d.universityId === me.universityId;
+    if (mode === "state") return d.stateId === me.stateId;
+    return d.universityId !== me.universityId;
+  }
+
+  async function findSomeone() {
+    if (me.discoverable === false) return;
+    $("find").disabled = true; $("find").textContent = "Finding someone new...";
+    $("out").innerHTML = `<div class="spin"></div>`;
+    try {
+      const r = Math.random();
+      let pool = (await fetchBatch(r, true)).filter(eligible);
+      if (!pool.length) pool = (await fetchBatch(r, false)).filter(eligible);
+      if (!pool.length) { showEmpty(); return; }
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      await setDoc(doc(db, "users", uid, "seen", pick.id), { at: serverTimestamp(), expiresAt: Timestamp.fromMillis(Date.now() + COOLDOWN_DAYS * 864e5) });
+      seen.add(pick.id);
+      showResult(pick.data());
+    } catch (e) {
+      console.error(e);
+      $("out").innerHTML = `<p class="error">Something went wrong. Please try again.</p>`;
+    } finally {
+      $("find").disabled = false; $("find").textContent = "FIND SOMEONE ELSE";
+    }
+  }
+  $("find").onclick = findSomeone;
+
+  function showEmpty() {
+    const alt = mode === "university" ? ["state", "other"] : mode === "state" ? ["other"] : [];
+    const names = { state: "MY STATE", other: "OTHER UNIVERSITIES" };
+    $("out").innerHTML = `
+      <div class="card" style="text-align:center">
+        <b>Looks like your discovery pool is a little small.</b>
+        <span>${alt.length ? "Try another discovery mode to meet more students." : "Nobody new right now. Come back soon as more students join."}</span>
+        <div style="margin-top:12px">${alt.map((m) => `<button class="btn ghost" data-switch="${m}">${names[m]}</button>`).join(" ")}</div>
+      </div>
+      <button class="btn ghost" id="share" style="margin-top:14px">📣 Invite friends to FAF</button>`;
+    $("out").querySelectorAll("[data-switch]").forEach((b) => b.onclick = () => { setMode(b.dataset.switch); findSomeone(); });
+    $("share").onclick = () => share();
+  }
+
+  function share() {
+    const text = "I just found someone from my university on FAF. Who will you find?";
+    const url = location.origin;
+    if (navigator.share) navigator.share({ title: "FAF", text, url }).catch(() => {});
+    else navigator.clipboard.writeText(text + " " + url).then(() => alert("Link copied. Paste it to your friends!"));
+  }
+
+  function showResult(d) {
+    const uni = findUniversityById(d.universityId);
+    const mine = new Set(me.interests || []);
+    const theirs = (d.interests || []).filter((i) => LABELS[i]);
+    const shared = theirs.filter((i) => mine.has(i));
+    const links = Object.entries(d.socials || {}).map(([pid, handle]) => {
+      const pl = PLATFORMS.find((x) => x.id === pid); const h = pl && normalizeHandle(pid, handle);
+      if (!h) return "";
+      const url = linkFor(pid, h);
+      return url
+        ? `<a class="btn ghost conn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${pl.icon} ${pl.label}</a>`
+        : `<span class="btn ghost conn">${pl.icon} ${pl.label}: <b>${esc(h)}</b></span>`;
+    }).join("");
+    $("out").innerHTML = `
+      <div class="card reveal" style="text-align:center">
+        <p class="muted" style="margin:0 0 8px;font-weight:700">YOU FOUND SOMEONE</p>
+        <div class="preview">${renderAvatar(d.avatarConfig)}</div>
+        <b style="margin-top:12px;font-size:20px">${esc(d.displayName)}, ${esc(d.age)}</b>
+        <span>${esc(d.collegeName)}<br>${esc(uni ? uni.name : "")}${uni ? " · " + esc(uni.state) : ""}</span>
+        <p style="margin-top:10px;font-size:14px">${theirs.map((i) => esc(LABELS[i])).join(" · ")}</p>
+        ${shared.length ? `<p style="font-size:14px;color:var(--violet);font-weight:700">You both like ${shared.map((i) => esc(LABELS[i])).join(", ")}</p>` : ""}
+        ${d.bio ? `<p class="muted" style="font-size:14px">${esc(d.bio)}</p>` : ""}
+        <p class="muted" style="font-size:13px">You might have crossed paths.</p>
+        <p class="lbl" style="margin-top:14px">CONNECT</p>
+        <div>${links || '<span class="muted" style="font-size:13px">No links shared.</span>'}</div>
+      </div>
+      <button class="btn ghost" id="share" style="margin-top:14px">📣 Share FAF</button>`;
+    $("share").onclick = () => share();
+    $("out").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 </script>
 </body>
 </html>

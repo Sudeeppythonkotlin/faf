@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Profile — FAF</title>
+  <meta name="theme-color" content="#6C47FF">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="center" style="justify-content:flex-start">
+  <div class="logo" style="font-size:36px">FAF</div>
+  <p class="headline" style="font-size:22px;margin-bottom:14px">Your profile</p>
+  <div id="app"><p class="muted">Loading...</p></div>
+</main>
+<script type="module">
+  import { db, watchUser } from "./firebase.js";
+  import { doc, getDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+  import { myCardHtml, mountNav } from "./ui.js";
+  mountNav("me");
+  watchUser(async (u) => {
+    if (!u) { location.href = "join.html"; return; }
+    const snap = await getDoc(doc(db, "users", u.uid));
+    const p = snap.exists() ? snap.data() : {};
+    if (!p.profileComplete) { location.href = "home.html"; return; }
+    const socials = await getDocs(collection(db, "users", u.uid, "socials"));
+    const socialDocs = []; socials.forEach((d) => socialDocs.push({ id: d.id, data: d.data() }));
+    document.getElementById("app").innerHTML = myCardHtml(p, socialDocs) + `
+      <div style="margin-top:16px">
+        <a class="btn ghost" href="profile.html">Edit profile</a>
+        <a class="btn ghost" href="avatar.html">Edit avatar</a>
+        <a class="btn ghost" href="social.html">Edit links</a>
+      </div>`;
+  });
+</script>
+</body>
+</html>

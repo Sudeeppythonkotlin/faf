@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings — FAF</title>
+  <meta name="theme-color" content="#6C47FF">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="center" style="justify-content:flex-start">
+  <div class="logo" style="font-size:36px">FAF</div>
+  <p class="headline" style="font-size:22px;margin-bottom:14px">Settings</p>
+  <div class="list">
+    <a href="profile.html">✏️ Edit profile</a>
+    <a href="avatar.html">🙂 Edit avatar</a>
+    <a href="social.html">🔗 Social connections</a>
+    <a href="legal.html#safety">🛡️ Safety</a>
+    <a href="legal.html#privacy">🔒 Privacy Policy</a>
+    <a href="legal.html#terms">📄 Terms</a>
+    <a href="#" id="out">🚪 Log out</a>
+  </div>
+</main>
+<script type="module">
+  import { watchUser, logout } from "./firebase.js";
+  import { mountNav } from "./ui.js";
+  mountNav("settings");
+  watchUser((u) => { if (!u) location.href = "join.html"; });
+  document.getElementById("out").onclick = async (e) => { e.preventDefault(); await logout(); location.href = "index.html"; };
+</script>
+</body>
+</html>

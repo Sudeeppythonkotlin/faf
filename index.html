@@ -4,24 +4,65 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FAF — Meet someone new</title>
-  <meta name="description" content="Discover students from your university, your state, or universities across India. One person at a time.">
+  <meta name="description" content="Discover students from your university, your state, or universities across India. One person at a time. No swiping.">
+  <meta name="theme-color" content="#6C47FF">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main class="center">
+<main class="land">
   <div class="logo">FAF</div>
-  <p class="headline">Meet someone new.</p>
-  <p class="muted">You never know who you've crossed paths with.</p>
-  <p class="muted" style="font-size:14px">Discover students from your university, your state, or universities across India. One person at a time. No swiping. No endless profiles.</p>
-  <a class="btn" href="join.html">JOIN FAF — IT'S FREE</a>
-  <a class="link" href="#how">HOW IT WORKS</a>
-  <section id="how" style="margin-top:56px">
+  <h1 class="hero">Meet someone new.</h1>
+  <p class="muted" style="font-size:17px">You never know who you've crossed paths with.</p>
+  <div class="avrow" id="avrow"></div>
+  <p class="muted" style="font-size:15px">Discover students from your university, your state, or universities across India. One person at a time. No swiping. No endless profiles.</p>
+  <a class="btn" id="cta" href="join.html">JOIN FAF — IT'S FREE</a>
+  <a class="link" href="#how">HOW IT WORKS ↓</a>
+
+  <section id="how" class="sec">
+    <h2>How it works</h2>
     <div class="card"><b>01 — CREATE</b><span>Create your student profile and avatar.</span></div>
     <div class="card"><b>02 — DISCOVER</b><span>Choose your university, state, or other universities.</span></div>
     <div class="card"><b>03 — FIND SOMEONE</b><span>Press the button and meet one random student.</span></div>
     <div class="card"><b>04 — CONNECT</b><span>Use the social platform they chose to share.</span></div>
   </section>
-  <p class="muted" style="font-size:12px;margin-top:40px">FAF is for students aged 18+ in India.</p>
+
+  <section class="sec">
+    <h2>Your world, your choice</h2>
+    <div class="card"><b>🏫 My University</b><span>Students from your own university, across different colleges.</span></div>
+    <div class="card"><b>📍 My State</b><span>Students from universities in your state.</span></div>
+    <div class="card"><b>🎓 Other Universities</b><span>Students from universities across India.</span></div>
+  </section>
+
+  <section class="sec">
+    <h2>Safe by design</h2>
+    <ul class="ticks">
+      <li>18+ students only</li>
+      <li>No profile photos: you choose an avatar</li>
+      <li>No exact location, phone number or email shown</li>
+      <li>No chat inside FAF: you decide where to connect</li>
+      <li>Block and report anyone, and hide yourself whenever you like</li>
+    </ul>
+  </section>
+
+  <a class="btn" id="cta2" href="join.html">JOIN FAF</a>
+  <p class="muted" style="font-size:12px;margin-top:36px">FAF is for students aged 18+ in India.<br>
+    <a href="legal.html#terms" class="link" style="margin:0 6px">Terms</a>
+    <a href="legal.html#privacy" class="link" style="margin:0 6px">Privacy</a>
+    <a href="legal.html#safety" class="link" style="margin:0 6px">Safety</a></p>
 </main>
+<script type="module">
+  import { renderAvatar } from "./avatar.js";
+  import { watchUser } from "./firebase.js";
+  const demo = [
+    { skin:0, hair:"long", hairColor:4, eyes:"happy", mouth:"grin", top:"hoodie", topColor:2, glasses:"none", hat:"none", bg:3 },
+    { skin:4, hair:"curly", hairColor:0, eyes:"wide", mouth:"open", top:"tee", topColor:3, glasses:"round", hat:"none", bg:1 },
+    { skin:2, hair:"short", hairColor:1, eyes:"dots", mouth:"smile", top:"collar", topColor:5, glasses:"none", hat:"cap", bg:4 },
+    { skin:3, hair:"bun", hairColor:6, eyes:"sleepy", mouth:"neutral", top:"hoodie", topColor:1, glasses:"sun", hat:"none", bg:2 },
+  ];
+  document.getElementById("avrow").innerHTML = demo.map((c) => `<div class="av">${renderAvatar(c)}</div>`).join("");
+  watchUser((u) => { if (u) for (const id of ["cta", "cta2"]) { const a = document.getElementById(id); a.href = "home.html"; a.textContent = "OPEN FAF"; } });
+</script>
 </body>
 </html>
