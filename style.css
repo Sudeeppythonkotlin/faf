@@ -40,11 +40,15 @@ input:focus, select:focus { outline:2px solid var(--violet); border-color:transp
 .btn.ghost + .btn.ghost { margin-left:6px; }
 
 /* Day 4: discover */
-.mode { display:flex; align-items:center; gap:14px; width:100%; margin-top:10px; padding:14px 16px; background:#fff; border:2px solid transparent; border-radius:20px; text-align:left; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,.06); font:inherit; color:var(--ink); }
-.mode.on { border-color:var(--violet); background:#F4F0FF; }
-.mode .ic { font-size:28px; }
-.mode b { display:block; font-size:14px; }
-.mode small { color:rgba(20,18,43,.6); font-size:12px; }
-.btn.find { font-size:22px; padding:20px; margin-top:24px; letter-spacing:.5px; }
-.btn.find:disabled { opacity:.6; }
-.btn.soc { background:var(--ink); box-shadow:none; font-size:16px; padding:12px; margin-top:10px; }
+.modes { display:flex; flex-direction:column; gap:10px; margin-top:8px; }
+.mode { text-align:left; background:#fff; border:2px solid rgba(20,18,43,.1); border-radius:20px; padding:14px 16px; cursor:pointer; display:grid; grid-template-columns:36px 1fr; column-gap:10px; font-family:inherit; color:var(--ink); }
+.mode span { grid-row:1 / span 2; font-size:26px; align-self:center; }
+.mode b { font-size:15px; }
+.mode i { font-style:normal; font-size:12px; color:rgba(20,18,43,.6); }
+.mode.on { border-color:var(--violet); background:#F3EFFF; }
+.btn.big { font-size:22px; padding:20px; margin-top:20px; }
+.conn { display:inline-block; margin:4px 3px; text-decoration:none; }
+.reveal { animation:pop .35s ease-out; }
+@keyframes pop { from { opacity:0; transform:translateY(12px) scale(.97); } to { opacity:1; transform:none; } }
+.spin { width:34px; height:34px; margin:24px auto; border:4px solid rgba(108,71,255,.2); border-top-color:var(--violet); border-radius:50%; animation:rot .8s linear infinite; }
+@keyframes rot { to { transform:rotate(360deg); } }

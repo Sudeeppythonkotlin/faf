@@ -2,17 +2,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() { return request.auth != null; }
-    function isMe(uid) { return request.auth != null && request.auth.uid == uid; }
-
-    // ---- Private user record: owner only, no listing ----
+    // ---- Private account data: owner only ----
     match /users/{uid} {
-      allow get: if isMe(uid);
+      allow get: if request.auth != null && request.auth.uid == uid;
       allow list: if false;
-      allow create: if isMe(uid)
+      allow create: if request.auth != null && request.auth.uid == uid
         && request.resource.data.ageConfirmed == true
         && request.resource.data.accountStatus == 'active';
-      allow update: if isMe(uid)
+      allow update: if request.auth != null && request.auth.uid == uid
         && request.resource.data.accountStatus == resource.data.accountStatus
         && request.resource.data.ageConfirmed == true
         && (!('age' in request.resource.data) || request.resource.data.age >= 18)
@@ -21,43 +18,34 @@ service cloud.firestore {
       allow delete: if false;
 
       match /socials/{platform} {
-        allow read, delete: if isMe(uid);
-        allow create, update: if isMe(uid)
+        allow read, delete: if request.auth != null && request.auth.uid == uid;
+        allow create, update: if request.auth != null && request.auth.uid == uid
           && platform in ['instagram', 'snapchat', 'linkedin', 'discord']
           && request.resource.data.handle is string
           && request.resource.data.handle.size() <= 100
           && request.resource.data.visible is bool;
       }
-      // who I have already discovered (30-day cooldown)
-      match /discoveries/{other} {
-        allow read, write: if isMe(uid);
-      }
-      // people I blocked
-      match /blocked/{other} {
-        allow read, write: if isMe(uid);
-      }
-      // people who blocked me (they write the marker, I read it)
+      // discovery history (30-day cooldown) and my block list: owner only
+      match /seen/{other} { allow read, write: if request.auth != null && request.auth.uid == uid; }
+      match /blocks/{other} { allow read, write: if request.auth != null && request.auth.uid == uid; }
+      // "someone blocked me" markers: anyone signed in can add/remove only THEIR OWN marker; I can read mine
       match /blockedBy/{blocker} {
-        allow read, delete: if isMe(uid);
-        allow create: if isMe(blocker);
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow create, delete: if request.auth != null && request.auth.uid == blocker;
       }
     }
 
-    // ---- Public discovery copy: safe fields only. Reads are small (max 8 per query). ----
+    // ---- Public discovery cards: what other students may see ----
     match /pool/{uid} {
-      allow get: if signedIn();
-      allow list: if signedIn() && request.query.limit <= 8;
-      allow create, update: if isMe(uid)
-        && request.resource.data.keys().hasOnly(['displayName','age','collegeName','universityId','stateId','avatarConfig','interests','bio','rand','active','socials','updatedAt'])
-        && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 30
-        && request.resource.data.age is int && request.resource.data.age >= 18
-        && request.resource.data.interests.size() <= 8
-        && request.resource.data.bio.size() <= 100
-        && request.resource.data.rand is number && request.resource.data.rand >= 0 && request.resource.data.rand <= 1
-        && request.resource.data.universityId == get(/databases/$(database)/documents/users/$(uid)).data.universityId
-        && request.resource.data.active == (get(/databases/$(database)/documents/users/$(uid)).data.discoverable == true
-             && get(/databases/$(database)/documents/users/$(uid)).data.accountStatus == 'active');
-      allow delete: if isMe(uid);
+      allow get: if request.auth != null;
+      // lists must be small (max 60 cards per query)
+      allow list: if request.auth != null && request.query.limit <= 60;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && get(/databases/$(database)/documents/users/$(uid)).data.accountStatus == 'active'
+        && get(/databases/$(database)/documents/users/$(uid)).data.discoverable == true
+        && request.resource.data.age >= 18
+        && request.resource.data.keys().hasOnly(['displayName','age','collegeName','universityId','stateId','interests','avatarConfig','bio','socials','rand','updatedAt']);
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
     match /{document=**} { allow read, write: if false; }

@@ -1,29 +1,18 @@
-// Keeps a small PUBLIC copy of your profile (no email, no DOB) in "pool/<uid>" so FIND SOMEONE can discover you.
-import { doc, getDoc, getDocs, setDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+// Keeps your public "discovery card" (pool/{uid}) in sync with your private profile.
+// The card holds ONLY what other students may see. Discoverability OFF = card deleted = nobody can find you.
+import { doc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 
-function ageFrom(dobStr, fallback) {
-  if (!dobStr) return fallback;
-  const d = new Date(dobStr), n = new Date();
-  let a = n.getFullYear() - d.getFullYear();
-  const m = n.getMonth() - d.getMonth();
-  if (m < 0 || (m === 0 && n.getDate() < d.getDate())) a--;
-  return a;
-}
-
-export async function syncPool(db, uid) {
-  const us = await getDoc(doc(db, "users", uid));
-  if (!us.exists()) return;
-  const u = us.data();
-  if (!(u.profileComplete && u.avatarConfig && u.universityId)) return; // profile not finished yet
-  const soc = await getDocs(collection(db, "users", uid, "socials"));
+export async function syncPool(db, uid, p, socialDocs) {
+  if (!p.profileComplete) return;
+  const ref = doc(db, "pool", uid);
+  if (!p.discoverable) { try { await deleteDoc(ref); } catch (e) {} return; }
   const socials = {};
-  soc.forEach((d) => { if (d.data().visible !== false) socials[d.id] = d.data().handle; });
-  await setDoc(doc(db, "pool", uid), {
-    displayName: u.displayName, age: ageFrom(u.dateOfBirth, u.age), collegeName: u.collegeName,
-    universityId: u.universityId, stateId: u.stateId, avatarConfig: u.avatarConfig,
-    interests: u.interests || [], bio: u.bio || "",
-    rand: typeof u.rand === "number" ? u.rand : Math.random(),
-    active: u.discoverable === true && u.accountStatus === "active",
-    socials, updatedAt: serverTimestamp(),
+  socialDocs.forEach((d) => { if (d.data.visible !== false && d.data.handle) socials[d.id] = d.data.handle; });
+  await setDoc(ref, {
+    displayName: p.displayName, age: p.age, collegeName: p.collegeName,
+    universityId: p.universityId, stateId: p.stateId,
+    interests: p.interests || [], avatarConfig: p.avatarConfig, bio: p.bio || "",
+    socials, rand: typeof p.rand === "number" ? p.rand : Math.random(),
+    updatedAt: serverTimestamp(),
   });
 }
