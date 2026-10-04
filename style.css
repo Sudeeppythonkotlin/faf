@@ -186,3 +186,12 @@ input.bad { border-color:#B3261E; box-shadow:3px 3px 0 #F4B6B0; }
 
 .chips.bad, .chips.bad + .fieldmsg { border-radius:14px; }
 .chips.bad { outline:2px solid #B3261E; outline-offset:4px; }
+
+/* Day 9: swipe deck */
+.deck { position:relative; margin-top:20px; }
+.deck::before { content:""; position:absolute; inset:16px 12px -12px; background:#fff; border:var(--line); border-radius:28px; transform:rotate(2.2deg); z-index:0; }
+.deck::after { content:""; position:absolute; inset:8px 6px -6px; background:var(--lemon); border:var(--line); border-radius:28px; transform:rotate(-1.4deg); z-index:0; }
+.swipecard { position:relative; z-index:1; touch-action:pan-y; user-select:none; -webkit-user-select:none; cursor:grab; will-change:transform; }
+.swipecard:active { cursor:grabbing; }
+.deck .pass { margin-top:0; }
+.swipehint { text-align:center; margin-top:26px; font-size:13px; font-weight:700; color:rgba(23,24,44,.55); }

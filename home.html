@@ -36,17 +36,26 @@
 
   mountNav("home");
   const COOLDOWN_DAYS = 30;
-  const DAILY_LIMIT = 40; // max presses per day (soft limit)
+  const DAILY_LIMIT = 100; // profiles shown per day (soft limit)
   const dayKey = () => new Date().toLocaleDateString("en-CA");
   const MODE_COUNTER = { university: "mUniversity", other: "mOther", state: "mState" };
   const $ = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
   let uid = null, me = {}, mode = "university";
-  let seen = new Set(), usedToday = 0, shownCount = 0, hasResult = false, spinTimer = null;
+  let seen = new Set(), usedToday = 0, shownCount = 0, spinTimer = null;
+  let deck = [], current = null, sessionOn = false, loading = null, busy = false;
 
-  $("modes").addEventListener("click", (e) => { const b = e.target.closest(".mode"); if (b) setMode(b.dataset.m); });
-  function setMode(m) { mode = m; document.querySelectorAll(".mode").forEach((x) => x.setAttribute("aria-pressed", x.dataset.m === m)); }
+  // ---------- mode cards ----------
+  const paintMode = () => document.querySelectorAll(".mode").forEach((x) => x.setAttribute("aria-pressed", x.dataset.m === mode));
+  $("modes").addEventListener("click", (e) => {
+    const b = e.target.closest(".mode"); if (!b || b.dataset.m === mode) return;
+    mode = b.dataset.m; paintMode();
+    if (sessionOn) startSession(); // changing where you look starts a fresh run
+  });
 
+  // ---------- load the signed-in user ----------
   watchUser(async (u) => {
     if (!u) { location.href = "join.html"; return; }
     uid = u.uid;
@@ -80,6 +89,7 @@
     usedToday = us.exists() ? (us.data().count || 0) : 0;
   }
 
+  // ---------- finding people ----------
   async function fetchBatch(r, up) {
     const base = collection(db, "pool");
     const field = mode === "state" ? "stateId" : "universityId";
@@ -106,6 +116,20 @@
     return d.universityId !== me.universityId;
   }
 
+  // keeps a shuffled queue of eligible students; refills itself from a new random spot in the pool
+  function loadDeck() {
+    if (loading) return loading;
+    loading = (async () => {
+      const have = new Set(deck.map((c) => c.id)); if (current) have.add(current.id);
+      const r = Math.random();
+      let docs = (await fetchBatch(r, true)).filter(eligible);
+      if (docs.length < 8) docs = docs.concat((await fetchBatch(r, false)).filter(eligible));
+      const uniq = new Map(); docs.forEach((d) => { if (!have.has(d.id)) uniq.set(d.id, d); });
+      deck = deck.concat(shuffle([...uniq.values()]));
+    })().finally(() => { loading = null; });
+    return loading;
+  }
+
   const LOOKING = { university: ["Looking around your campus…", "Checking the canteen…", "Peeking into the library…"], other: ["Looking across India…", "Checking other campuses…", "Asking around…"], state: ["Looking around your state…", "Checking nearby campuses…", "Asking around…"] };
   function showLoading() {
     const lines = LOOKING[mode]; let i = 0;
@@ -114,52 +138,75 @@
     spinTimer = setInterval(() => { i = (i + 1) % lines.length; const el = $("looking"); if (el) el.textContent = lines[i]; }, 900);
   }
 
-  async function findSomeone() {
+  // press "Find someone": starts a run. After that, swipe (or press Next student) for each new person.
+  async function startSession() {
     if (me.discoverable === false) { toast('Turn on "Show me to other students" in Settings first.'); return; }
-    if (usedToday >= DAILY_LIMIT) { $("out").innerHTML = `<div class="card"><b>You've found a lot of people today.</b><span>Come back tomorrow for more.</span></div>`; return; }
-    usedToday++;
-    setDoc(doc(db, "users", uid, "usage", dayKey()), { count: increment(1) }, { merge: true }).catch(() => {});
-    track("find_someone_clicked", hasResult ? ["finds", MODE_COUNTER[mode], "elseClicks"] : ["finds", MODE_COUNTER[mode]], { mode });
+    if (usedToday >= DAILY_LIMIT) { limitMsg(); return; }
+    track("find_someone_clicked", ["finds", MODE_COUNTER[mode]], { mode });
+    sessionOn = true; deck = []; current = null; busy = false;
     $("find").disabled = true; $("find").textContent = "Looking…";
     showLoading();
     try {
-      const work = (async () => {
-        const r = Math.random();
-        let pool = (await fetchBatch(r, true)).filter(eligible);
-        if (!pool.length) pool = (await fetchBatch(r, false)).filter(eligible);
-        return pool;
-      })();
-      const [pool] = await Promise.all([work, sleep(900)]); // a short pause makes the reveal feel intentional
+      await Promise.all([loadDeck(), sleep(900)]); // a short pause makes the first reveal feel intentional
       clearInterval(spinTimer);
-      if (!pool.length) { hasResult = false; track("discovery_empty", ["empty"], { mode }); showEmpty(); return; }
-      const pick = pool[Math.floor(Math.random() * pool.length)];
-      await setDoc(doc(db, "users", uid, "seen", pick.id), { at: serverTimestamp(), expiresAt: Timestamp.fromMillis(Date.now() + COOLDOWN_DAYS * 864e5) });
-      seen.add(pick.id);
-      hasResult = true; shownCount++;
-      track("discovery_success", ["success"], { mode });
-      showResult(pick.data());
+      await showNext();
     } catch (e) {
-      clearInterval(spinTimer); console.error(e);
+      clearInterval(spinTimer); console.error(e); sessionOn = false;
       $("out").innerHTML = `<div class="card"><b>That didn't work.</b><span>Check your connection and press the button again.</span></div>`;
     } finally {
-      $("find").disabled = false; $("find").textContent = hasResult ? "Find someone else" : "Find someone";
+      $("find").disabled = false; $("find").textContent = current ? "Next student" : "Find someone";
     }
   }
-  $("find").onclick = findSomeone;
 
+  async function showNext() {
+    if (usedToday >= DAILY_LIMIT) { current = null; limitMsg(); return; }
+    if (!deck.length) { try { await loadDeck(); } catch (e) { console.error(e); } }
+    if (!deck.length) { current = null; track("discovery_empty", ["empty"], { mode }); showEmpty(); return; }
+    current = deck.shift();
+    usedToday++; shownCount++;
+    seen.add(current.id);
+    setDoc(doc(db, "users", uid, "seen", current.id), { at: serverTimestamp(), expiresAt: Timestamp.fromMillis(Date.now() + COOLDOWN_DAYS * 864e5) }).catch(() => {});
+    setDoc(doc(db, "users", uid, "usage", dayKey()), { count: increment(1) }, { merge: true }).catch(() => {});
+    track("discovery_success", ["success"], { mode });
+    renderCard(current.data());
+    if (deck.length <= 2) loadDeck().catch(() => {}); // top up quietly in the background
+  }
+
+  // move to the next person (called by swipe, arrow keys or the button)
+  async function advance(dir = 1) {
+    if (!sessionOn || !current || busy) return;
+    busy = true;
+    track("find_someone_else_clicked", ["elseClicks"], { mode });
+    const el = $("card");
+    if (el) { el.style.transition = "transform .25s ease-in, opacity .25s"; el.style.transform = `translateX(${dir * window.innerWidth}px) rotate(${dir * 18}deg)`; el.style.opacity = "0"; await sleep(230); }
+    try { await showNext(); } finally { busy = false; $("find").textContent = current ? "Next student" : "Find someone"; }
+  }
+
+  $("find").onclick = () => { if (sessionOn && current) advance(1); else startSession(); };
+  document.addEventListener("keydown", (e) => {
+    if (!sessionOn || !current || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    if (e.key === "ArrowRight") advance(1); else if (e.key === "ArrowLeft") advance(-1);
+  });
+
+  // ---------- messages ----------
+  function limitMsg() {
+    $("out").innerHTML = `<div class="card reveal"><b>You've met a lot of people today.</b><span>Come back tomorrow for more.</span></div>`;
+  }
   function showEmpty() {
     const alt = mode === "university" ? ["state", "other"] : mode === "state" ? ["other"] : [];
     const names = { state: "My state", other: "Other universities" };
+    const met = shownCount > 0;
     $("out").innerHTML = `
       <div class="card reveal" style="text-align:center">
-        <b>${alt.length ? "Quiet around here." : "You've met everyone for now."}</b>
-        <span>${alt.length ? "Not many students here yet. Try looking somewhere wider." : "Come back soon, more students are joining."}</span>
+        <b>${met ? "You've seen everyone here for now." : alt.length ? "Quiet around here." : "Nobody new right now."}</b>
+        <span>${alt.length ? "Try looking somewhere wider to meet more students." : "Come back soon, more students are joining."}</span>
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center">${alt.map((m) => `<button class="btn ghost" data-switch="${m}">Try ${names[m].toLowerCase()}</button>`).join("")}</div>
       </div>
       <p class="caption">The more friends join, the better this gets.</p>
       <div style="text-align:center;margin-top:8px"><button class="btn ghost" id="share">📣 Invite friends</button></div>`;
-    $("out").querySelectorAll("[data-switch]").forEach((b) => b.onclick = () => { setMode(b.dataset.switch); findSomeone(); });
+    $("out").querySelectorAll("[data-switch]").forEach((b) => b.onclick = () => { mode = b.dataset.switch; paintMode(); startSession(); });
     $("share").onclick = share;
+    $("find").textContent = "Find someone";
   }
 
   function share() {
@@ -169,7 +216,8 @@
     else navigator.clipboard.writeText(text + " " + url).then(() => toast("Link copied. Paste it to your friends!"));
   }
 
-  function showResult(d) {
+  // ---------- the card + swiping ----------
+  function renderCard(d) {
     const mine = new Set(me.interests || []);
     const shared = (d.interests || []).filter((i) => LABELS[i] && mine.has(i));
     const links = Object.entries(d.socials || {}).map(([pid, handle]) => {
@@ -180,14 +228,42 @@
         ? `<a class="conn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${pl.icon} Open on ${pl.label}</a>`
         : `<div class="conn plain">${pl.icon} ${pl.label}: <b>${esc(h)}</b></div>`;
     }).join("");
-    $("out").innerHTML = passHtml(d, { shared, label: "Campus pass", links: `<p class="lbl">Say hi on</p><div id="conns">${links || '<p class="hint">No links shared.</p>'}</div>` }) +
-      `<p class="caption">You might have crossed paths.</p>
-       <div style="text-align:center;margin-top:6px"><button class="btn ghost" id="share">📣 Share FAF</button></div>
-       ${shownCount % 3 === 0 ? adHtml() : ""}`;
+    $("out").innerHTML = `
+      <div class="deck"><div class="swipecard" id="card">${passHtml(d, { shared, label: "Campus pass", links: `<p class="lbl">Say hi on</p><div id="conns">${links || '<p class="hint">No links shared.</p>'}</div>` })}</div></div>
+      <p class="swipehint">⟵ Swipe left or right for the next student ⟶</p>
+      <div style="text-align:center;margin-top:8px"><button class="btn ghost" id="share">📣 Share FAF</button></div>
+      ${shownCount % 8 === 0 ? adHtml() : ""}`;
     $("share").onclick = share;
     $("conns").onclick = (e) => { if (e.target.closest(".conn")) track("external_social_clicked", ["connectClicks"]); };
-    if (shownCount % 3 === 0) mountAd();
-    $("out").scrollIntoView({ behavior: "smooth", block: "start" });
+    attachSwipe($("card"));
+    if (shownCount % 8 === 0) mountAd();
+    if (shownCount === 1) $("out").scrollIntoView({ behavior: "smooth", block: "start" });
+    else if ($("out").getBoundingClientRect().top < 0) $("out").scrollIntoView({ block: "start" });
+  }
+
+  function attachSwipe(el) {
+    let sx = 0, sy = 0, dx = 0, dragging = false, moved = false, pid = null;
+    el.addEventListener("pointerdown", (e) => {
+      if (e.target.closest("a, button, .conn")) return;           // links stay tappable
+      dragging = true; moved = false; sx = e.clientX; sy = e.clientY; dx = 0; pid = e.pointerId;
+      el.style.transition = "none";
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      dx = e.clientX - sx; const dy = e.clientY - sy;
+      if (!moved && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) { moved = true; try { el.setPointerCapture(pid); } catch (er) {} }
+      if (!moved) return;
+      el.style.transform = `translateX(${dx}px) rotate(${dx / 20}deg)`;
+      el.style.opacity = String(1 - Math.min(Math.abs(dx) / 420, 0.45));
+    });
+    const end = () => {
+      if (!dragging) return; dragging = false;
+      try { el.releasePointerCapture(pid); } catch (er) {}
+      if (moved && Math.abs(dx) > 90) advance(dx > 0 ? 1 : -1);
+      else { el.style.transition = "transform .2s, opacity .2s"; el.style.transform = ""; el.style.opacity = ""; }
+    };
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", end);
   }
 </script>
 </body>
