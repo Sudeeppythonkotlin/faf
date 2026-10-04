@@ -4,38 +4,38 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Settings — FAF</title>
-  <meta name="theme-color" content="#6C47FF">
+  <meta name="theme-color" content="#F4F6FB">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main class="center" style="justify-content:flex-start">
-  <div class="logo" style="font-size:36px">FAF</div>
-  <p class="headline" style="font-size:22px;margin-bottom:14px">Settings</p>
+<main>
+  <span class="logo">FAF</span>
+  <h1 class="pagehead">Settings</h1>
 
-  <div class="card" style="margin-top:0">
+  <div class="card" style="margin-top:18px">
     <label class="switchrow">
-      <span><b style="color:var(--ink)">Show me to other students</b><span>When off, nobody can discover you. You can't discover others either.</span></span>
-      <input type="checkbox" id="disc" disabled>
+      <span><b>Show me to other students</b><span>When this is off, nobody can find you, and you can't find others either.</span></span>
+      <input type="checkbox" id="disc" disabled aria-label="Show me to other students">
     </label>
     <p class="hint" id="discMsg"></p>
   </div>
 
   <div class="list">
-    <a href="profile.html">✏️ Edit profile</a>
-    <a href="avatar.html">🙂 Edit avatar</a>
-    <a href="social.html">🔗 Social connections</a>
-    <a href="legal.html#safety">🛡️ Safety</a>
-    <a href="legal.html#privacy">🔒 Privacy Policy</a>
-    <a href="legal.html#terms">📄 Terms</a>
-    <a href="admin.html" id="adminLink" style="display:none">🛠️ Admin</a>
-    <a href="#" id="out">🚪 Log out</a>
+    <a href="profile.html"><span>✏️</span>Edit profile</a>
+    <a href="avatar.html"><span>🙂</span>Edit avatar</a>
+    <a href="social.html"><span>🔗</span>Social links</a>
+    <a href="legal.html#safety"><span>🛡️</span>Safety tips</a>
+    <a href="legal.html#privacy"><span>🔒</span>Privacy policy</a>
+    <a href="legal.html#terms"><span>📄</span>Terms</a>
+    <a href="admin.html" id="adminLink" style="display:none"><span>🛠️</span>Admin</a>
+    <a href="#" id="out"><span>🚪</span>Log out</a>
   </div>
 
   <div class="card danger">
-    <b style="color:#c0392b">Delete account</b>
-    <span>Permanently deletes your profile, avatar, links and history. This cannot be undone.</span>
-    <button class="btn ghost" id="del" style="margin-top:10px;color:#c0392b;border-color:#c0392b">Delete my account</button>
-    <p class="error" id="delErr"></p>
+    <b>Delete account</b>
+    <span>This permanently deletes your profile, avatar, links and history. It can't be undone.</span>
+    <button class="btn ghost" id="del" style="margin-top:12px;border-color:#B3261E;color:#B3261E;box-shadow:3px 3px 0 #B3261E">Delete my account</button>
+    <p class="error" id="delErr" role="alert"></p>
   </div>
 </main>
 <script type="module">
@@ -45,7 +45,7 @@
   import { GoogleAuthProvider, reauthenticateWithPopup, deleteUser }
     from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
   import { syncPool } from "./pool.js";
-  import { mountNav } from "./ui.js";
+  import { mountNav, toast } from "./ui.js";
 
   mountNav("settings");
   const $ = (id) => document.getElementById(id);
@@ -60,18 +60,19 @@
     socialDocs = []; s.forEach((d) => socialDocs.push({ id: d.id, data: d.data() }));
     $("disc").checked = me.discoverable === true;
     $("disc").disabled = !me.profileComplete;
-    if (!me.profileComplete) $("discMsg").textContent = "Finish your profile first (avatar and social links).";
-    try { const a = await getDoc(doc(db, "admins", uid)); if (a.exists()) $("adminLink").style.display = "block"; } catch (e) {}
+    $("discMsg").textContent = me.profileComplete ? (me.discoverable ? "You're visible to other students." : "You're hidden.") : "Finish your profile first (avatar and links).";
+    try { const a = await getDoc(doc(db, "admins", uid)); if (a.exists()) $("adminLink").style.display = "flex"; } catch (e) {}
   });
 
   $("disc").onchange = async () => {
-    const on = $("disc").checked; $("disc").disabled = true; $("discMsg").textContent = "Saving...";
+    const on = $("disc").checked; $("disc").disabled = true; $("discMsg").textContent = "Saving…";
     try {
       await setDoc(doc(db, "users", uid), { discoverable: on, updatedAt: serverTimestamp() }, { merge: true });
       me.discoverable = on;
       await syncPool(db, uid, me, socialDocs);
-      $("discMsg").textContent = on ? "You are visible to other students." : "You are hidden.";
-    } catch (e) { console.error(e); $("disc").checked = !on; $("discMsg").textContent = "Could not save. Please try again."; }
+      $("discMsg").textContent = on ? "You're visible to other students." : "You're hidden.";
+      toast(on ? "You're visible again." : "You're hidden from discovery.");
+    } catch (e) { console.error(e); $("disc").checked = !on; $("discMsg").textContent = "We couldn't save that. Try again."; }
     $("disc").disabled = false;
   };
 
@@ -80,7 +81,7 @@
   $("del").onclick = async () => {
     const err = $("delErr"); err.textContent = "";
     if (prompt("This permanently deletes your FAF account.\nType DELETE to confirm.") !== "DELETE") return;
-    $("del").disabled = true; $("del").textContent = "Deleting...";
+    $("del").disabled = true; $("del").textContent = "Deleting…";
     try {
       await reauthenticateWithPopup(auth.currentUser, new GoogleAuthProvider());
       await deleteDoc(doc(db, "pool", uid)); // stop being discoverable immediately
@@ -93,7 +94,7 @@
       location.href = "index.html";
     } catch (e) {
       console.error(e);
-      err.textContent = e.code === "auth/popup-closed-by-user" ? "Deletion cancelled." : "Could not delete the account. Please try again.";
+      err.textContent = e.code === "auth/popup-closed-by-user" ? "Deletion cancelled." : "We couldn't delete the account. Try again.";
       $("del").disabled = false; $("del").textContent = "Delete my account";
     }
   };

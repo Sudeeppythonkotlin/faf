@@ -4,49 +4,48 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FAF</title>
-  <meta name="theme-color" content="#6C47FF">
+  <meta name="theme-color" content="#F4F6FB">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main class="center" style="justify-content:flex-start">
-  <div class="logo" style="font-size:44px">FAF</div>
-  <p class="headline" style="font-size:26px;margin-top:6px">Meet someone new.</p>
-  <p class="muted" style="font-size:14px">You never know who you've crossed paths with.</p>
+<main>
+  <span class="logo">FAF</span>
+  <h1 class="pagehead" id="hello">Meet someone new.</h1>
+  <p class="sub">You never know who you've crossed paths with.</p>
 
-  <p class="lbl" style="margin-top:22px;text-align:left">WHERE DO YOU WANT TO DISCOVER?</p>
-  <div class="modes" id="modes">
-    <button class="mode on" data-m="university"><span>🏫</span><b>MY UNIVERSITY</b><i>Students from your university.</i></button>
-    <button class="mode" data-m="other"><span>🎓</span><b>OTHER UNIVERSITIES</b><i>Students from universities across India.</i></button>
-    <button class="mode" data-m="state"><span>📍</span><b>MY STATE</b><i>Students from universities in your state.</i></button>
+  <span class="lbl">Where do you want to look?</span>
+  <div class="modes" id="modes" role="group" aria-label="Where to look">
+    <button class="mode" data-m="university" aria-pressed="true"><span class="ico">🏫</span><b>My university</b><i>Students from your university</i></button>
+    <button class="mode" data-m="other" aria-pressed="false"><span class="ico">🎓</span><b>Other universities</b><i>Students from across India</i></button>
+    <button class="mode" data-m="state" aria-pressed="false"><span class="ico">📍</span><b>My state</b><i>Students from universities in your state</i></button>
   </div>
-  <button class="btn big" id="find" disabled>FIND SOMEONE</button>
-  <div id="out"><p class="muted" style="margin-top:20px">Loading...</p></div>
+  <button class="btn big" id="find" disabled>Find someone</button>
+  <div id="out" aria-live="polite"></div>
 </main>
 <script type="module">
   import { db, watchUser } from "./firebase.js";
   import { doc, getDoc, getDocs, setDoc, collection, query, where, orderBy, limit, serverTimestamp, Timestamp, increment }
     from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
-  import { findUniversityById } from "./universities.js";
-  import { renderAvatar } from "./avatar.js";
   import { PLATFORMS, normalizeHandle, linkFor } from "./social.js";
   import { syncPool } from "./pool.js";
-  import { esc, LABELS, mountNav } from "./ui.js";
+  import { esc, LABELS, mountNav, passHtml, toast } from "./ui.js";
   import { track } from "./analytics.js";
   import { adHtml, mountAd } from "./ads.js";
 
   mountNav("home");
   const COOLDOWN_DAYS = 30;
-  const DAILY_LIMIT = 40; // max FIND SOMEONE presses per day (soft limit)
+  const DAILY_LIMIT = 40; // max presses per day (soft limit)
   const dayKey = () => new Date().toLocaleDateString("en-CA");
   const MODE_COUNTER = { university: "mUniversity", other: "mOther", state: "mState" };
   const $ = (id) => document.getElementById(id);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   let uid = null, me = {}, mode = "university";
-  let seen = new Set(), usedToday = 0, shownCount = 0, hasResult = false;
+  let seen = new Set(), usedToday = 0, shownCount = 0, hasResult = false, spinTimer = null;
 
   $("modes").addEventListener("click", (e) => { const b = e.target.closest(".mode"); if (b) setMode(b.dataset.m); });
-  function setMode(m) { mode = m; document.querySelectorAll(".mode").forEach((x) => x.classList.toggle("on", x.dataset.m === m)); }
+  function setMode(m) { mode = m; document.querySelectorAll(".mode").forEach((x) => x.setAttribute("aria-pressed", x.dataset.m === m)); }
 
   watchUser(async (u) => {
     if (!u) { location.href = "join.html"; return; }
@@ -55,7 +54,7 @@
     me = snap.exists() ? snap.data() : {};
     if (me.accountStatus && me.accountStatus !== "active") {
       $("find").style.display = "none"; $("modes").style.display = "none";
-      $("out").innerHTML = `<div class="card"><b>Your account is not active.</b><span>Please contact us if you think this is a mistake.</span></div>`;
+      $("out").innerHTML = `<div class="card"><b>Your account isn't active right now.</b><span>If you think this is a mistake, please contact us.</span></div>`;
       return;
     }
     if (!me.universityId) { location.href = "profile.html"; return; }
@@ -66,8 +65,9 @@
     const socialDocs = []; socials.forEach((d) => socialDocs.push({ id: d.id, data: d.data() }));
     try { await syncPool(db, uid, me, socialDocs); } catch (e) { console.error("pool sync failed", e); }
 
-    $("out").innerHTML = me.discoverable === false
-      ? `<p class="muted" style="margin-top:16px">You're hidden right now, so you can't discover people either. Turn "Show me" back on in Settings.</p>` : "";
+    if (me.displayName) $("hello").textContent = `Hey ${me.displayName}, who's next?`;
+    if (new URLSearchParams(location.search).get("welcome")) { toast("You're in! Press Find someone to meet your first student."); history.replaceState(null, "", "home.html"); }
+    if (me.discoverable === false) $("out").innerHTML = `<p class="hint" style="margin-top:16px">You're hidden right now, so you can't find people either. Turn on "Show me to other students" in Settings.</p>`;
     await loadContext();
     $("find").disabled = false;
   });
@@ -106,18 +106,31 @@
     return d.universityId !== me.universityId;
   }
 
+  const LOOKING = { university: ["Looking around your campus…", "Checking the canteen…", "Peeking into the library…"], other: ["Looking across India…", "Checking other campuses…", "Asking around…"], state: ["Looking around your state…", "Checking nearby campuses…", "Asking around…"] };
+  function showLoading() {
+    const lines = LOOKING[mode]; let i = 0;
+    $("out").innerHTML = `<div class="skelpass"><div class="pass-band"></div><div class="pass-av"></div><div class="line"></div><div class="line s"></div><p id="looking">${lines[0]}</p></div>`;
+    clearInterval(spinTimer);
+    spinTimer = setInterval(() => { i = (i + 1) % lines.length; const el = $("looking"); if (el) el.textContent = lines[i]; }, 900);
+  }
+
   async function findSomeone() {
-    if (me.discoverable === false) return;
-    if (usedToday >= DAILY_LIMIT) { $("out").innerHTML = `<p class="muted" style="margin-top:16px">You've discovered a lot of people today. Come back later.</p>`; return; }
+    if (me.discoverable === false) { toast('Turn on "Show me to other students" in Settings first.'); return; }
+    if (usedToday >= DAILY_LIMIT) { $("out").innerHTML = `<div class="card"><b>You've found a lot of people today.</b><span>Come back tomorrow for more.</span></div>`; return; }
     usedToday++;
     setDoc(doc(db, "users", uid, "usage", dayKey()), { count: increment(1) }, { merge: true }).catch(() => {});
     track("find_someone_clicked", hasResult ? ["finds", MODE_COUNTER[mode], "elseClicks"] : ["finds", MODE_COUNTER[mode]], { mode });
-    $("find").disabled = true; $("find").textContent = "Finding someone new...";
-    $("out").innerHTML = `<div class="spin"></div>`;
+    $("find").disabled = true; $("find").textContent = "Looking…";
+    showLoading();
     try {
-      const r = Math.random();
-      let pool = (await fetchBatch(r, true)).filter(eligible);
-      if (!pool.length) pool = (await fetchBatch(r, false)).filter(eligible);
+      const work = (async () => {
+        const r = Math.random();
+        let pool = (await fetchBatch(r, true)).filter(eligible);
+        if (!pool.length) pool = (await fetchBatch(r, false)).filter(eligible);
+        return pool;
+      })();
+      const [pool] = await Promise.all([work, sleep(900)]); // a short pause makes the reveal feel intentional
+      clearInterval(spinTimer);
       if (!pool.length) { hasResult = false; track("discovery_empty", ["empty"], { mode }); showEmpty(); return; }
       const pick = pool[Math.floor(Math.random() * pool.length)];
       await setDoc(doc(db, "users", uid, "seen", pick.id), { at: serverTimestamp(), expiresAt: Timestamp.fromMillis(Date.now() + COOLDOWN_DAYS * 864e5) });
@@ -126,63 +139,52 @@
       track("discovery_success", ["success"], { mode });
       showResult(pick.data());
     } catch (e) {
-      console.error(e);
-      $("out").innerHTML = `<p class="error">Something went wrong. Please try again.</p>`;
+      clearInterval(spinTimer); console.error(e);
+      $("out").innerHTML = `<div class="card"><b>That didn't work.</b><span>Check your connection and press the button again.</span></div>`;
     } finally {
-      $("find").disabled = false; $("find").textContent = hasResult ? "FIND SOMEONE ELSE" : "FIND SOMEONE";
+      $("find").disabled = false; $("find").textContent = hasResult ? "Find someone else" : "Find someone";
     }
   }
   $("find").onclick = findSomeone;
 
   function showEmpty() {
     const alt = mode === "university" ? ["state", "other"] : mode === "state" ? ["other"] : [];
-    const names = { state: "MY STATE", other: "OTHER UNIVERSITIES" };
+    const names = { state: "My state", other: "Other universities" };
     $("out").innerHTML = `
-      <div class="card" style="text-align:center">
-        <b>Looks like your discovery pool is a little small.</b>
-        <span>${alt.length ? "Try another discovery mode to meet more students." : "Nobody new right now. Come back soon as more students join."}</span>
-        <div style="margin-top:12px">${alt.map((m) => `<button class="btn ghost" data-switch="${m}">${names[m]}</button>`).join(" ")}</div>
+      <div class="card reveal" style="text-align:center">
+        <b>${alt.length ? "Quiet around here." : "You've met everyone for now."}</b>
+        <span>${alt.length ? "Not many students here yet. Try looking somewhere wider." : "Come back soon, more students are joining."}</span>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center">${alt.map((m) => `<button class="btn ghost" data-switch="${m}">Try ${names[m].toLowerCase()}</button>`).join("")}</div>
       </div>
-      <button class="btn ghost" id="share" style="margin-top:14px">📣 Invite friends to FAF</button>`;
+      <p class="caption">The more friends join, the better this gets.</p>
+      <div style="text-align:center;margin-top:8px"><button class="btn ghost" id="share">📣 Invite friends</button></div>`;
     $("out").querySelectorAll("[data-switch]").forEach((b) => b.onclick = () => { setMode(b.dataset.switch); findSomeone(); });
-    $("share").onclick = () => share();
+    $("share").onclick = share;
   }
 
   function share() {
-    const text = "I just found someone from my university on FAF. Who will you find?";
+    const text = "I'm finding students on FAF. Who will you find?";
     const url = location.origin;
     if (navigator.share) navigator.share({ title: "FAF", text, url }).catch(() => {});
-    else navigator.clipboard.writeText(text + " " + url).then(() => alert("Link copied. Paste it to your friends!"));
+    else navigator.clipboard.writeText(text + " " + url).then(() => toast("Link copied. Paste it to your friends!"));
   }
 
   function showResult(d) {
-    const uni = findUniversityById(d.universityId);
     const mine = new Set(me.interests || []);
-    const theirs = (d.interests || []).filter((i) => LABELS[i]);
-    const shared = theirs.filter((i) => mine.has(i));
+    const shared = (d.interests || []).filter((i) => LABELS[i] && mine.has(i));
     const links = Object.entries(d.socials || {}).map(([pid, handle]) => {
       const pl = PLATFORMS.find((x) => x.id === pid); const h = pl && normalizeHandle(pid, handle);
       if (!h) return "";
       const url = linkFor(pid, h);
       return url
-        ? `<a class="btn ghost conn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${pl.icon} ${pl.label}</a>`
-        : `<span class="btn ghost conn">${pl.icon} ${pl.label}: <b>${esc(h)}</b></span>`;
+        ? `<a class="conn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${pl.icon} Open on ${pl.label}</a>`
+        : `<div class="conn plain">${pl.icon} ${pl.label}: <b>${esc(h)}</b></div>`;
     }).join("");
-    $("out").innerHTML = `
-      <div class="card reveal" style="text-align:center">
-        <p class="muted" style="margin:0 0 8px;font-weight:700">YOU FOUND SOMEONE</p>
-        <div class="preview">${renderAvatar(d.avatarConfig)}</div>
-        <b style="margin-top:12px;font-size:20px">${esc(d.displayName)}, ${esc(d.age)}</b>
-        <span>${esc(d.collegeName)}<br>${esc(uni ? uni.name : "")}${uni ? " · " + esc(uni.state) : ""}</span>
-        <p style="margin-top:10px;font-size:14px">${theirs.map((i) => esc(LABELS[i])).join(" · ")}</p>
-        ${shared.length ? `<p style="font-size:14px;color:var(--violet);font-weight:700">You both like ${shared.map((i) => esc(LABELS[i])).join(", ")}</p>` : ""}
-        <p class="muted" style="font-size:13px">You might have crossed paths.</p>
-        <p class="lbl" style="margin-top:14px">CONNECT</p>
-        <div id="conns">${links || '<span class="muted" style="font-size:13px">No links shared.</span>'}</div>
-      </div>
-      <button class="btn ghost" id="share" style="margin-top:14px">📣 Share FAF</button>
-      ${shownCount % 3 === 0 ? adHtml() : ""}`;
-    $("share").onclick = () => share();
+    $("out").innerHTML = passHtml(d, { shared, label: "Campus pass", links: `<p class="lbl">Say hi on</p><div id="conns">${links || '<p class="hint">No links shared.</p>'}</div>` }) +
+      `<p class="caption">You might have crossed paths.</p>
+       <div style="text-align:center;margin-top:6px"><button class="btn ghost" id="share">📣 Share FAF</button></div>
+       ${shownCount % 3 === 0 ? adHtml() : ""}`;
+    $("share").onclick = share;
     $("conns").onclick = (e) => { if (e.target.closest(".conn")) track("external_social_clicked", ["connectClicks"]); };
     if (shownCount % 3 === 0) mountAd();
     $("out").scrollIntoView({ behavior: "smooth", block: "start" });

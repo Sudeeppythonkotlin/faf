@@ -3,23 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Your social links — FAF</title>
+  <title>Your links — FAF</title>
+  <meta name="theme-color" content="#F4F6FB">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main style="justify-content:flex-start">
-  <div class="logo" style="font-size:40px">FAF</div>
-  <p class="headline" style="font-size:24px">How can people connect?</p>
-  <p class="muted" style="font-size:14px">FAF has no chat. Add at least one account. Others only see accounts you switch on.</p>
+<main>
+  <span class="logo">FAF</span>
+  <div id="stepSlot"></div>
+  <h1 class="pagehead">Where can people say hi?</h1>
+  <p class="sub">FAF has no chat. Add at least one account, and switch on the ones you want people to see.</p>
   <div id="list"></div>
-  <button class="btn" id="save">Save &amp; continue</button>
-  <p class="error" id="err"></p>
+  <div class="actionbar"><button class="btn" id="save">Save and finish</button><p class="error" id="err" role="alert"></p></div>
 </main>
 <script type="module">
   import { db, watchUser } from "./firebase.js";
   import { doc, getDoc, getDocs, setDoc, deleteDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
   import { PLATFORMS, normalizeHandle } from "./social.js";
-  import { syncPool } from "./pool.js";
+  import { stepper } from "./ui.js";
 
   const $ = (id) => document.getElementById(id);
   let uid = null, userData = {}, existing = {};
@@ -27,8 +28,9 @@
   $("list").innerHTML = PLATFORMS.map((p) => `
     <div class="card">
       <b>${p.icon} ${p.label}</b>
-      <input id="h-${p.id}" placeholder="${p.ph}" autocapitalize="none" autocomplete="off">
-      <label class="tog"><input type="checkbox" id="v-${p.id}" checked> Show on my profile</label>
+      <label class="lbl" for="h-${p.id}" style="margin-top:8px;font-weight:500">${p.hint}</label>
+      <input id="h-${p.id}" placeholder="${p.ph}" autocapitalize="none" autocorrect="off" autocomplete="off">
+      <label class="switchrow" style="margin-top:12px"><span>Show on my profile</span><input type="checkbox" id="v-${p.id}" checked></label>
     </div>`).join("");
 
   watchUser(async (u) => {
@@ -36,12 +38,9 @@
     uid = u.uid;
     const us = await getDoc(doc(db, "users", uid));
     userData = us.exists() ? us.data() : {};
+    if (!userData.profileComplete) $("stepSlot").innerHTML = stepper(3);
     const snap = await getDocs(collection(db, "users", uid, "socials"));
-    snap.forEach((d) => {
-      existing[d.id] = d.data();
-      const h = $("h-" + d.id), v = $("v-" + d.id);
-      if (h) { h.value = d.data().handle || ""; v.checked = d.data().visible !== false; }
-    });
+    snap.forEach((d) => { existing[d.id] = d.data(); const h = $("h-" + d.id), v = $("v-" + d.id); if (h) { h.value = d.data().handle || ""; v.checked = d.data().visible !== false; } });
   });
 
   $("save").onclick = async () => {
@@ -51,12 +50,13 @@
       const raw = $("h-" + p.id).value.trim();
       if (!raw) { entries.push({ p, handle: null }); continue; }
       const handle = normalizeHandle(p.id, raw);
-      if (!handle) return err.textContent = `That ${p.label} username doesn't look right.`;
+      if (!handle) { $("h-" + p.id).classList.add("bad"); $("h-" + p.id).focus(); return err.textContent = `That ${p.label} username doesn't look right. Use just the username or your profile link.`; }
+      $("h-" + p.id).classList.remove("bad");
       entries.push({ p, handle, visible: $("v-" + p.id).checked });
     }
     const filled = entries.filter((e) => e.handle);
-    if (!filled.length) return err.textContent = "Add at least one account.";
-    if (!filled.some((e) => e.visible)) return err.textContent = "Switch on at least one account so people can connect with you.";
+    if (!filled.length) return err.textContent = "Add at least one account so people can reach you.";
+    if (!filled.some((e) => e.visible)) return err.textContent = "Switch on at least one account. Otherwise nobody can connect with you.";
 
     $("save").disabled = true; $("save").textContent = "Saving...";
     try {
@@ -65,14 +65,14 @@
         if (e.handle) await setDoc(ref, { handle: e.handle, visible: e.visible, updatedAt: serverTimestamp() }, { merge: true });
         else if (existing[e.p.id]) await deleteDoc(ref);
       }
+      const first = !userData.profileComplete;
       const upd = { profileComplete: true, updatedAt: serverTimestamp() };
-      if (!userData.profileComplete) upd.discoverable = true; // turned ON the first time; user controls it later
+      if (first) upd.discoverable = true; // ON the first time; the person controls it in Settings
       await setDoc(doc(db, "users", uid), upd, { merge: true });
-      await syncPool(db, uid);
-      location.href = "home.html";
+      location.href = first ? "home.html?welcome=1" : "me.html";
     } catch (er) {
-      console.error(er); err.textContent = "Could not save. Please try again.";
-      $("save").disabled = false; $("save").textContent = "Save & continue";
+      console.error(er); err.textContent = "We couldn't save that. Check your connection and try again.";
+      $("save").disabled = false; $("save").textContent = "Save and finish";
     }
   };
 </script>

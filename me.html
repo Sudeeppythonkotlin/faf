@@ -4,19 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Profile — FAF</title>
-  <meta name="theme-color" content="#6C47FF">
+  <meta name="theme-color" content="#F4F6FB">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main class="center" style="justify-content:flex-start">
-  <div class="logo" style="font-size:36px">FAF</div>
-  <p class="headline" style="font-size:22px;margin-bottom:14px">Your profile</p>
-  <div id="app"><p class="muted">Loading...</p></div>
+<main>
+  <span class="logo">FAF</span>
+  <h1 class="pagehead">Your profile</h1>
+  <p class="sub">This is how other students see you.</p>
+  <div id="app"><div class="skelpass"><div class="pass-band"></div><div class="pass-av"></div><div class="line"></div><div class="line s"></div></div></div>
 </main>
 <script type="module">
   import { db, watchUser } from "./firebase.js";
   import { doc, getDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
-  import { myCardHtml, mountNav } from "./ui.js";
+  import { PLATFORMS } from "./social.js";
+  import { esc, passHtml, mountNav } from "./ui.js";
   mountNav("me");
   watchUser(async (u) => {
     if (!u) { location.href = "join.html"; return; }
@@ -24,12 +26,12 @@
     const p = snap.exists() ? snap.data() : {};
     if (!p.profileComplete) { location.href = "home.html"; return; }
     const socials = await getDocs(collection(db, "users", u.uid, "socials"));
-    const socialDocs = []; socials.forEach((d) => socialDocs.push({ id: d.id, data: d.data() }));
-    document.getElementById("app").innerHTML = myCardHtml(p, socialDocs) + `
-      <div style="margin-top:16px">
-        <a class="btn ghost" href="profile.html">Edit profile</a>
-        <a class="btn ghost" href="avatar.html">Edit avatar</a>
-        <a class="btn ghost" href="social.html">Edit links</a>
+    const rows = []; socials.forEach((d) => { const pl = PLATFORMS.find((x) => x.id === d.id); if (pl) rows.push(`<div class="conn plain">${pl.icon} ${pl.label}: <b>${esc(d.data().handle)}</b>${d.data().visible === false ? " (hidden)" : ""}</div>`); });
+    document.getElementById("app").innerHTML = passHtml(p, { label: "Campus pass", links: `<p class="lbl">Your links</p>${rows.join("")}` }) + `
+      <div class="list" style="margin-top:20px">
+        <a href="profile.html"><span>✏️</span>Edit profile</a>
+        <a href="avatar.html"><span>🙂</span>Edit avatar</a>
+        <a href="social.html"><span>🔗</span>Edit links</a>
       </div>`;
   });
 </script>

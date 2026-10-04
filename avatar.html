@@ -4,65 +4,84 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Your avatar — FAF</title>
+  <meta name="theme-color" content="#F4F6FB">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main style="justify-content:flex-start">
-  <div class="logo" style="font-size:40px">FAF</div>
-  <p class="headline" style="font-size:24px">Build your avatar</p>
-  <p class="muted" style="font-size:14px">This is how other students will see you. No photos needed.</p>
-  <div id="preview" class="preview"></div>
-  <button class="btn ghost" id="rand" style="margin:12px auto 0;display:block">🎲 Randomise</button>
+<main>
+  <span class="logo">FAF</span>
+  <div id="stepSlot"></div>
+  <h1 class="pagehead">Build your avatar</h1>
+  <p class="sub">This is how other students will see you. No photos needed.</p>
+
+  <div class="stage">
+    <div class="preview" id="preview"></div>
+    <div class="tabs" role="tablist" id="tabs"></div>
+  </div>
   <div id="opts"></div>
-  <button class="btn" id="save">Save avatar</button>
-  <p class="error" id="err"></p>
+
+  <div class="actionbar">
+    <div class="row">
+      <button class="btn ghost" id="rand" type="button">🎲 Surprise me</button>
+      <button class="btn" id="save">Save avatar</button>
+    </div>
+    <p class="error" id="err" role="alert"></p>
+  </div>
 </main>
 <script type="module">
   import { db, watchUser } from "./firebase.js";
   import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
-  import { OPTIONS, defaultAvatar, randomAvatar, renderAvatar } from "./avatar.js";
-  import { syncPool } from "./pool.js";
+  import { GROUPS, OPTIONS, defaultAvatar, randomAvatar, renderAvatar } from "./avatar.js";
+  import { stepper } from "./ui.js";
 
   const $ = (id) => document.getElementById(id);
-  let cfg = defaultAvatar(), uid = null;
+  let cfg = defaultAvatar(), uid = null, tab = "face", complete = false;
 
-  function draw() {
-    $("preview").innerHTML = renderAvatar(cfg);
-    $("opts").innerHTML = OPTIONS.map((o) => `
-      <label class="lbl">${o.label}</label>
+  function drawPreview() { $("preview").innerHTML = renderAvatar(cfg); }
+  function drawTabs() {
+    $("tabs").innerHTML = GROUPS.map(([id, name]) => `<button class="tab" role="tab" aria-selected="${id === tab}" data-t="${id}">${name}</button>`).join("");
+  }
+  function drawOpts() {
+    $("opts").innerHTML = OPTIONS.filter((o) => o.g === tab).map((o) => `
+      <span class="lbl">${o.label}</span>
       <div class="chips">${o.colors
-        ? o.colors.map((col, i) => `<button type="button" class="swatch ${cfg[o.key] === i ? "on" : ""}" data-k="${o.key}" data-v="${i}" style="background:${col}" aria-label="${o.label} ${i + 1}"></button>`).join("")
-        : o.opts.map(([id, name]) => `<button type="button" class="chip ${cfg[o.key] === id ? "on" : ""}" data-k="${o.key}" data-v="${id}">${name}</button>`).join("")}
+        ? o.colors.map((col, i) => `<button type="button" class="swatch ${cfg[o.key] === i ? "on" : ""}" data-k="${o.key}" data-v="${i}" style="background:${col}" aria-label="${o.label} ${i + 1}" aria-pressed="${cfg[o.key] === i}"></button>`).join("")
+        : o.opts.map(([id, name]) => `<button type="button" class="chip ${cfg[o.key] === id ? "on" : ""}" data-k="${o.key}" data-v="${id}" aria-pressed="${cfg[o.key] === id}">${name}</button>`).join("")}
       </div>`).join("");
   }
-  $("opts").addEventListener("click", (e) => {
+  const drawAll = () => { drawPreview(); drawTabs(); drawOpts(); };
+
+  $("tabs").onclick = (e) => { const b = e.target.closest("[data-t]"); if (b) { tab = b.dataset.t; drawTabs(); drawOpts(); } };
+  $("opts").onclick = (e) => {
     const b = e.target.closest("[data-k]"); if (!b) return;
     const o = OPTIONS.find((x) => x.key === b.dataset.k);
     cfg[o.key] = o.colors ? Number(b.dataset.v) : b.dataset.v;
-    draw();
-  });
-  $("rand").onclick = () => { cfg = randomAvatar(); draw(); };
+    drawPreview(); drawOpts();
+  };
+  $("rand").onclick = () => { cfg = randomAvatar(); drawAll(); };
 
   watchUser(async (u) => {
     if (!u) { location.href = "join.html"; return; }
     uid = u.uid;
     const snap = await getDoc(doc(db, "users", uid));
-    if (snap.exists() && snap.data().avatarConfig) cfg = { ...defaultAvatar(), ...snap.data().avatarConfig };
-    draw();
+    const p = snap.exists() ? snap.data() : {};
+    complete = !!p.profileComplete;
+    if (!complete) $("stepSlot").innerHTML = stepper(2);
+    if (p.avatarConfig) cfg = { ...defaultAvatar(), ...p.avatarConfig };
+    drawAll();
   });
 
   $("save").onclick = async () => {
     $("save").disabled = true; $("save").textContent = "Saving...";
     try {
       await setDoc(doc(db, "users", uid), { avatarConfig: cfg, updatedAt: serverTimestamp() }, { merge: true });
-      await syncPool(db, uid);
-      location.href = "home.html";
+      location.href = complete ? "me.html" : "social.html";
     } catch (e) {
-      console.error(e); $("err").textContent = "Could not save. Please try again.";
+      console.error(e); $("err").textContent = "We couldn't save your avatar. Check your connection and try again.";
       $("save").disabled = false; $("save").textContent = "Save avatar";
     }
   };
-  draw();
+  drawAll();
 </script>
 </body>
 </html>
