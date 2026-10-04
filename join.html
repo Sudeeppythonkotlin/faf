@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Join FAF</title>
   <meta name="theme-color" content="#F4F6FB">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="FAF">
+  <script>window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__bip=e;});</script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -22,6 +28,7 @@
   <p class="hint" style="margin-top:18px">We never post anything or see your Google password.</p>
 </main>
 <script type="module">
+  import "./install.js";
   import { signInWithGoogle, watchUser } from "./firebase.js";
   const a = document.getElementById("is18"), b = document.getElementById("terms");
   const btn = document.getElementById("go"), err = document.getElementById("err"), txt = document.getElementById("goTxt");

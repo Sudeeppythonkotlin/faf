@@ -6,7 +6,11 @@
   <title>FAF</title>
   <meta name="theme-color" content="#F4F6FB">
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="FAF">
+  <script>window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__bip=e;});</script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,6 +18,13 @@
   <span class="logo">FAF</span>
   <h1 class="pagehead" id="hello">Meet someone new.</h1>
   <p class="sub">You never know who you've crossed paths with.</p>
+
+  <div class="banner" id="installBanner" hidden>
+    <span class="bico">📲</span>
+    <div><b>Get the FAF app</b><span>Add it to your home screen in one tap.</span></div>
+    <button class="btn ghost" data-install type="button">Install</button>
+    <button class="x" id="bannerX" aria-label="Dismiss" type="button">✕</button>
+  </div>
 
   <span class="lbl">Where do you want to look?</span>
   <div class="modes" id="modes" role="group" aria-label="Where to look">
@@ -33,6 +44,7 @@
   import { esc, LABELS, mountNav, passHtml, toast } from "./ui.js";
   import { track } from "./analytics.js";
   import { adHtml, mountAd } from "./ads.js";
+  import { isStandalone } from "./install.js";
 
   mountNav("home");
   const COOLDOWN_DAYS = 30;
@@ -77,6 +89,12 @@
     if (me.displayName) $("hello").textContent = `Hey ${me.displayName}, who's next?`;
     if (new URLSearchParams(location.search).get("welcome")) { toast("You're in! Press Find someone to meet your first student."); history.replaceState(null, "", "home.html"); }
     if (me.discoverable === false) $("out").innerHTML = `<p class="hint" style="margin-top:16px">You're hidden right now, so you can't find people either. Turn on "Show me to other students" in Settings.</p>`;
+    // gentle one-time nudge to install the app (hidden for 14 days if dismissed, never shown inside the app)
+    try {
+      const dismissed = Number(localStorage.getItem("faf_install_dismissed") || 0);
+      if (!isStandalone() && Date.now() - dismissed > 14 * 864e5) $("installBanner").hidden = false;
+      $("bannerX").onclick = () => { $("installBanner").hidden = true; localStorage.setItem("faf_install_dismissed", String(Date.now())); };
+    } catch (e) {}
     await loadContext();
     $("find").disabled = false;
   });

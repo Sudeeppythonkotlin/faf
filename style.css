@@ -195,3 +195,21 @@ input.bad { border-color:#B3261E; box-shadow:3px 3px 0 #F4B6B0; }
 .swipecard:active { cursor:grabbing; }
 .deck .pass { margin-top:0; }
 .swipehint { text-align:center; margin-top:26px; font-size:13px; font-weight:700; color:rgba(23,24,44,.55); }
+
+
+/* Day 10: install app */
+.btn.white { background:#fff; }
+.banner { display:flex; align-items:center; gap:10px; margin-top:16px; padding:10px 10px 10px 12px; background:var(--lemon); border:var(--line); border-radius:18px; position:relative; }
+.banner[hidden] { display:none; }
+.banner .bico { font-size:24px; }
+.banner div { flex:1; min-width:0; }
+.banner b { display:block; font-size:15px; }
+.banner div span { font-size:13px; color:rgba(23,24,44,.72); }
+.banner .btn.ghost { min-height:40px; padding:6px 12px; font-size:14px; }
+.banner .x { position:absolute; top:-10px; right:-6px; width:28px; height:28px; border-radius:50%; border:2px solid var(--ink); background:#fff; font-size:12px; cursor:pointer; }
+.sheetwrap { position:fixed; inset:0; z-index:100; display:flex; align-items:flex-end; justify-content:center; background:rgba(23,24,44,.55); }
+.sheet { width:100%; max-width:480px; padding:22px 20px calc(22px + env(safe-area-inset-bottom)); background:var(--paper); border:var(--line); border-bottom:0; border-radius:26px 26px 0 0; animation:rise .25s ease-out; }
+.sheet h2 { font-size:24px; }
+.sheet ol { margin:14px 0 0; padding-left:22px; }
+.sheet li { margin-top:10px; font-size:16px; }
+@keyframes rise { from { transform:translateY(40px); opacity:0; } to { transform:none; opacity:1; } }

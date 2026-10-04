@@ -1,13 +1,19 @@
 {
-  "name": "FAF — Find A Friend",
+  "id": "/",
+  "name": "FAF: Find A Friend",
   "short_name": "FAF",
   "description": "Meet someone new. Discover students across India.",
+  "lang": "en-IN",
   "start_url": "/home.html",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#FAF8F4",
-  "theme_color": "#6C47FF",
+  "orientation": "portrait",
+  "background_color": "#F4F6FB",
+  "theme_color": "#F4F6FB",
+  "categories": ["social"],
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

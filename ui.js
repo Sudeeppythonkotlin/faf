@@ -1,3 +1,4 @@
+import "./install.js";
 import { findUniversityById, INTERESTS } from "./universities.js";
 import { renderAvatar, BG } from "./avatar.js";
 

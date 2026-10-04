@@ -7,7 +7,11 @@
   <meta name="description" content="Discover students from your university, your state, or universities across India. One person at a time.">
   <meta name="theme-color" content="#F4F6FB">
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="FAF">
+  <script>window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__bip=e;});</script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,7 +20,8 @@
   <h1 class="hero">Meet someone new.</h1>
   <p class="lead">You never know who you've crossed paths with. Press one button and meet a student from your campus, your state, or anywhere in India.</p>
   <a class="btn" id="cta" href="join.html">Join FAF, it's free</a>
-  <p class="hint" style="text-align:center">For students aged 18+ in India</p>
+  <button class="btn white" data-install type="button">📲 Get the app</button>
+  <p class="hint" style="text-align:center">Free, no app store needed. For students aged 18+ in India.</p>
 
   <section class="demo" aria-label="Example profiles">
     <span class="tape">Example</span>
@@ -56,6 +61,7 @@
   </section>
 
   <a class="btn" id="cta2" href="join.html">Join FAF</a>
+  <button class="btn white" data-install type="button">📲 Get the app</button>
   <p class="foot">FAF is for students aged 18+ in India.<br>
     <a href="legal.html#terms">Terms</a><a href="legal.html#privacy">Privacy</a><a href="legal.html#safety">Safety</a></p>
 </main>
