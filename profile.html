@@ -109,7 +109,7 @@
   for (const k of ["name", "dob", "college"]) $(k).addEventListener("input", () => clearMsg(k));
 
   watchUser(async (u) => {
-    if (!u) { location.href = "join.html"; return; }
+    if (!u) { location.href = "welcome.html"; return; }
     uid = u.uid;
     const snap = await getDoc(doc(db, "users", uid));
     docExists = snap.exists(); existing = docExists ? snap.data() : {};

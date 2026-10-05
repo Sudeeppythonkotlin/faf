@@ -40,7 +40,7 @@
     </div>`).join("");
 
   watchUser(async (u) => {
-    if (!u) { location.href = "join.html"; return; }
+    if (!u) { location.href = "welcome.html"; return; }
     uid = u.uid;
     const us = await getDoc(doc(db, "users", uid));
     userData = us.exists() ? us.data() : {};

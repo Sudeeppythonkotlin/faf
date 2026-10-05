@@ -52,14 +52,14 @@
   import { GoogleAuthProvider, reauthenticateWithPopup, deleteUser }
     from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
   import { syncPool } from "./pool.js";
-  import { mountNav, toast } from "./ui.js";
+  import { mountNav, toast, goAfterLogout } from "./ui.js";
 
   mountNav("settings");
   const $ = (id) => document.getElementById(id);
   let uid = null, me = {}, socialDocs = [];
 
   watchUser(async (u) => {
-    if (!u) { location.href = "join.html"; return; }
+    if (!u) { location.href = "welcome.html"; return; }
     uid = u.uid;
     const snap = await getDoc(doc(db, "users", uid));
     me = snap.exists() ? snap.data() : {};
@@ -83,7 +83,7 @@
     $("disc").disabled = false;
   };
 
-  $("out").onclick = async (e) => { e.preventDefault(); await logout(); location.href = "index.html"; };
+  $("out").onclick = async (e) => { e.preventDefault(); await logout(); goAfterLogout(); };
 
   $("del").onclick = async () => {
     const err = $("delErr"); err.textContent = "";
@@ -98,7 +98,7 @@
       }
       await deleteDoc(doc(db, "users", uid));
       await deleteUser(auth.currentUser);
-      location.href = "index.html";
+      goAfterLogout();
     } catch (e) {
       console.error(e);
       err.textContent = e.code === "auth/popup-closed-by-user" ? "Deletion cancelled." : "We couldn't delete the account. Try again.";

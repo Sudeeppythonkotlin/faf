@@ -25,7 +25,7 @@
   const count = async (q) => (await getCountFromServer(q)).data().count;
 
   watchUser(async (u) => {
-    if (!u) { location.href = "join.html"; return; }
+    if (!u) { location.href = "welcome.html"; return; }
     let ok = false;
     try { ok = (await getDoc(doc(db, "admins", u.uid))).exists(); } catch (e) {}
     if (!ok) { $("app").innerHTML = `<p class="muted">Not authorised.</p>`; return; }

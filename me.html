@@ -27,7 +27,7 @@
   import { esc, passHtml, mountNav } from "./ui.js";
   mountNav("me");
   watchUser(async (u) => {
-    if (!u) { location.href = "join.html"; return; }
+    if (!u) { location.href = "welcome.html"; return; }
     const snap = await getDoc(doc(db, "users", u.uid));
     const p = snap.exists() ? snap.data() : {};
     if (!p.profileComplete) { location.href = "home.html"; return; }

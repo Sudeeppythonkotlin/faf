@@ -1,4 +1,4 @@
-import "./install.js";
+import { isStandalone } from "./install.js";
 import { findUniversityById, INTERESTS } from "./universities.js";
 import { renderAvatar, BG } from "./avatar.js";
 
@@ -53,3 +53,6 @@ export function passHtml(d, { shared = [], links = "", label = "" } = {}) {
     ${links ? `<div class="pass-links">${links}</div>` : ""}
   </article>`;
 }
+
+// After logging out: the installed app goes to the login screen, the website goes to the landing page
+export const goAfterLogout = () => { location.href = isStandalone() ? "welcome.html" : "index.html"; };

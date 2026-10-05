@@ -11,15 +11,17 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="FAF">
+  <script>if(matchMedia("(display-mode: standalone)").matches||navigator.standalone)location.replace("home.html");</script>
   <script>window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__bip=e;});</script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main class="land">
-  <span class="logo">FAF</span>
+  <header class="topbar"><span class="logo">FAF</span><a class="toplink" id="loginTop" data-guest href="welcome.html">Log in</a></header>
   <h1 class="hero">Meet someone new.</h1>
   <p class="lead">You never know who you've crossed paths with. Press one button and meet a student from your campus, your state, or anywhere in India.</p>
-  <a class="btn" id="cta" href="join.html">Join FAF, it's free</a>
+  <a class="btn" id="cta" href="welcome.html?tab=signup">Join FAF, it's free</a>
+  <p class="hint" style="text-align:center;margin-top:12px" data-guest>Already a member? <a href="welcome.html" style="font-weight:700;color:var(--ink)">Log in</a></p>
   <button class="btn white" data-install type="button">📲 Get the app</button>
   <p class="hint" style="text-align:center">Free, no app store needed. For students aged 18+ in India.</p>
 
@@ -60,7 +62,7 @@
     </ul>
   </section>
 
-  <a class="btn" id="cta2" href="join.html">Join FAF</a>
+  <a class="btn" id="cta2" href="welcome.html?tab=signup">Join FAF</a>
   <button class="btn white" data-install type="button">📲 Get the app</button>
   <p class="foot">FAF is for students aged 18+ in India.<br>
     <a href="legal.html#terms">Terms</a><a href="legal.html#privacy">Privacy</a><a href="legal.html#safety">Safety</a></p>
@@ -80,7 +82,7 @@
   const show = () => { document.getElementById("demoCard").innerHTML = passHtml(EX[i], { label: "Campus pass" }); };
   show();
   document.getElementById("demoBtn").onclick = () => { i = (i + 1) % EX.length; show(); document.getElementById("demoBtn").textContent = "Find someone else"; };
-  watchUser((u) => { if (u) for (const id of ["cta", "cta2"]) { const a = document.getElementById(id); a.href = "home.html"; a.textContent = "Open FAF"; } });
+  watchUser((u) => { if (u) { for (const id of ["cta", "cta2"]) { const a = document.getElementById(id); a.href = "home.html"; a.textContent = "Open FAF"; } document.querySelectorAll("[data-guest]").forEach((el) => (el.hidden = true)); } });
 </script>
 </body>
 </html>

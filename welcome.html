@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Log in or sign up — FAF</title>
+  <meta name="theme-color" content="#E3DCFF">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="FAF">
+  <script>window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__bip=e;});</script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="welbody">
+<div class="wel">
+  <header class="welhero">
+    <span class="logo">FAF</span>
+    <div class="wavs" id="wavs"></div>
+    <h1>Meet someone new.</h1>
+    <p>You never know who you've crossed paths with.</p>
+  </header>
+
+  <section class="welcard">
+    <div class="seg" role="tablist" aria-label="Log in or sign up">
+      <button role="tab" id="tabLogin" aria-selected="true">Log in</button>
+      <button role="tab" id="tabSignup" aria-selected="false">Sign up</button>
+    </div>
+
+    <div id="paneLogin">
+      <h2>Welcome back</h2>
+      <p class="sub">Log in with the Google account you used to join FAF.</p>
+      <button class="btn dark gbtn" id="goLogin" type="button"><span class="gmark"></span><span id="goLoginTxt">Log in with Google</span></button>
+    </div>
+
+    <div id="paneSignup" hidden>
+      <h2>Join FAF, it's free</h2>
+      <p class="sub">Sign in with Google, then set up your student profile in about two minutes.</p>
+      <label class="agree"><input type="checkbox" id="is18"><span>I'm <b>18 or older</b> and I'm a student in India.</span></label>
+      <label class="agree"><input type="checkbox" id="terms"><span>I agree to the <a href="legal.html#terms">Terms</a> and <a href="legal.html#privacy">Privacy Policy</a>.</span></label>
+      <button class="btn dark gbtn" id="goSignup" type="button" disabled><span class="gmark"></span><span id="goSignupTxt">Sign up with Google</span></button>
+    </div>
+
+    <p class="error" id="err" role="alert"></p>
+    <p class="hint" style="text-align:center;margin-top:14px">We never post anything or see your Google password.</p>
+    <p class="hint" style="text-align:center" id="aboutRow"><a href="index.html">What is FAF?</a></p>
+  </section>
+</div>
+<script type="module">
+  import "./install.js";
+  import { isStandalone } from "./install.js";
+  import { auth, db, watchUser, signInWithGoogle } from "./firebase.js";
+  import { GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
+  import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+  import { renderAvatar } from "./avatar.js";
+
+  const $ = (id) => document.getElementById(id);
+  let busy = false; // stops the auto-redirect while we're checking an account
+
+  // friendly sample faces (not real users)
+  const faces = [
+    { skin: 3, eyes: "happy", mouth: "grin", hair: "long", hairColor: 0, top: "hoodie", topColor: 2, bg: 3 },
+    { skin: 5, eyes: "wink", mouth: "smirk", hair: "sidepart", hairColor: 0, beard: "stubble", top: "collar", topColor: 5, bg: 4 },
+    { skin: 2, eyes: "open", mouth: "smile", hat: "scarf", top: "kurta", topColor: 7, bg: 1 },
+  ];
+  $("wavs").innerHTML = faces.map((c) => `<div class="wav">${renderAvatar(c)}</div>`).join("");
+  if (isStandalone()) $("aboutRow").hidden = true; // the installed app doesn't need the marketing page
+
+  // ---- tabs ----
+  function tab(which) {
+    const login = which !== "signup";
+    $("tabLogin").setAttribute("aria-selected", login); $("tabSignup").setAttribute("aria-selected", !login);
+    $("paneLogin").hidden = !login; $("paneSignup").hidden = login;
+    $("err").textContent = "";
+  }
+  $("tabLogin").onclick = () => tab("login");
+  $("tabSignup").onclick = () => tab("signup");
+  tab(new URLSearchParams(location.search).get("tab") === "signup" ? "signup" : "login");
+
+  const sync = () => $("goSignup").disabled = !($("is18").checked && $("terms").checked);
+  $("is18").onchange = sync; $("terms").onchange = sync;
+
+  const popupMsg = (e) => e && e.code === "auth/popup-closed-by-user" ? "The Google window was closed. Tap the button to try again."
+    : e && e.code === "auth/popup-blocked" ? "Your browser blocked the Google window. Allow pop-ups and try again."
+    : "That didn't work. Check your connection and try again.";
+
+  // ---- log in (existing accounts only) ----
+  $("goLogin").onclick = async () => {
+    busy = true; $("goLogin").disabled = true; $("goLoginTxt").textContent = "Logging in…"; $("err").textContent = "";
+    try {
+      const { user } = await signInWithPopup(auth, new GoogleAuthProvider());
+      const snap = await getDoc(doc(db, "users", user.uid));
+      if (!snap.exists()) {
+        await signOut(auth); // never leave someone signed in without having confirmed 18+ and the terms
+        tab("signup");
+        $("err").textContent = "We couldn't find a FAF account for that Google account. Sign up below to create one.";
+      } else { location.href = "home.html"; return; }
+    } catch (e) { console.error(e); $("err").textContent = popupMsg(e); }
+    busy = false; $("goLogin").disabled = false; $("goLoginTxt").textContent = "Log in with Google";
+  };
+
+  // ---- sign up (new accounts; needs the two confirmations) ----
+  $("goSignup").onclick = async () => {
+    busy = true; $("goSignup").disabled = true; $("goSignupTxt").textContent = "Signing up…"; $("err").textContent = "";
+    try { await signInWithGoogle(); location.href = "home.html"; return; }
+    catch (e) { console.error(e); $("err").textContent = popupMsg(e); }
+    busy = false; $("goSignupTxt").textContent = "Sign up with Google"; sync();
+  };
+
+  // already signed in (e.g. reopened the app)? go straight in
+  watchUser((u) => { if (u && !busy) location.href = "home.html"; });
+</script>
+</body>
+</html>

@@ -67,7 +67,7 @@
   $("rand").onclick = () => { cfg = randomAvatar(); drawAll(); };
 
   watchUser(async (u) => {
-    if (!u) { location.href = "join.html"; return; }
+    if (!u) { location.href = "welcome.html"; return; }
     uid = u.uid;
     const snap = await getDoc(doc(db, "users", uid));
     const p = snap.exists() ? snap.data() : {};
