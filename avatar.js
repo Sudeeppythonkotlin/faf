@@ -1,8 +1,8 @@
 // FAF avatar: a small config object -> SVG string. Every value is validated, so any user's config is safe to render.
 export const SKIN = ["#FFE3CF", "#F7CDA8", "#EBB68A", "#D49A6A", "#B97A4B", "#9A5E36", "#744324", "#4F2C18"];
 export const HAIRC = ["#1B1B1F", "#3B2416", "#6B4423", "#A5712F", "#D9A441", "#B5472B", "#A8ADB5", "#4D3DF7"];
-export const BG = ["#E3DCFF", "#C4F2E4", "#FFE2C7", "#FFD9E2", "#D3E5FF", "#FFF2BF", "#E6E6EA", "#CFEFD0"];
-export const TOPC = ["#4D3DF7", "#17182C", "#19C39A", "#F2545B", "#FFB020", "#3B82F6", "#FFFFFF", "#F4A6C0"];
+export const BG = ["#D5DAFF", "#C8F3E3", "#FFD9CC", "#FFD3E8", "#C9E8F7", "#FFEFA8", "#E2E3EA", "#D6F0C8"];
+export const TOPC = ["#2B3AF2", "#16184A", "#2FD9A0", "#FF5A3C", "#FFD84A", "#7C8CFF", "#F7F7FB", "#FF9ECF"];
 
 export const GROUPS = [["face", "Face"], ["hair", "Hair"], ["outfit", "Outfit"], ["bg", "Backdrop"]];
 export const OPTIONS = [
@@ -47,14 +47,14 @@ function clean(cfg) {
   return out;
 }
 
-const INK = "#2B2118", LIP = "#3A1F1F";
+const INK = "#2B2118", LIP = "#3A1F1F", OUT = "#16184A";
 
 export function renderAvatar(config) {
   const c = clean(config);
   const skin = SKIN[c.skin], hc = HAIRC[c.hairColor], bg = BG[c.bg], tc = TOPC[c.topColor];
   const scarf = c.hat === "scarf";
   const head = "M54 90 C54 60 72 42 100 42 C128 42 146 60 146 90 C146 122 128 148 100 148 C72 148 54 122 54 90 Z";
-  let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Avatar"><rect width="200" height="200" fill="${bg}"/>`;
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Avatar"><defs><pattern id="ht${c.bg}" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="4" cy="4" r="1.25" fill="rgba(22,24,74,.13)"/></pattern></defs><rect width="200" height="200" fill="${bg}"/><rect width="200" height="200" fill="url(#ht${c.bg})"/><g stroke="${OUT}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">`;
 
   // ---- hair behind the head ----
   if (!scarf) {
@@ -67,29 +67,29 @@ export function renderAvatar(config) {
 
   // ---- body ----
   s += `<path d="M20 200 C22 166 52 158 80 156 L120 156 C148 158 178 166 180 200 Z" fill="${tc}"/>`;
-  if (c.top === "hoodie") s += `<path d="M62 152 C58 128 72 118 84 130 L116 130 C128 118 142 128 138 152 L130 170 Q100 184 70 170Z" fill="${tc}" stroke="rgba(0,0,0,.22)" stroke-width="2.5"/><path d="M62 152 C58 128 72 118 84 130 L116 130 C128 118 142 128 138 152 L130 170 Q100 184 70 170Z" fill="rgba(0,0,0,.14)"/>`;
+  if (c.top === "hoodie") s += `<path d="M62 152 C58 128 72 118 84 130 L116 130 C128 118 142 128 138 152 L130 170 Q100 184 70 170Z" fill="${tc}" stroke="rgba(0,0,0,.22)" stroke-width="2.5"/><path d="M62 152 C58 128 72 118 84 130 L116 130 C128 118 142 128 138 152 L130 170 Q100 184 70 170Z" fill="rgba(0,0,0,.14)" stroke="none"/>`;
   // neck
-  s += `<path d="M86 134 L86 162 Q100 172 114 162 L114 134 Z" fill="${skin}"/><path d="M86 140 Q100 158 114 140 L114 152 Q100 164 86 152Z" fill="rgba(0,0,0,.10)"/>`;
+  s += `<path d="M86 134 L86 162 Q100 172 114 162 L114 134 Z" fill="${skin}"/><path stroke="none" d="M86 140 Q100 158 114 140 L114 152 Q100 164 86 152Z" fill="rgba(0,0,0,.10)"/>`;
   // neckline + details
-  if (c.top === "tee") s += `<path d="M80 156 Q100 178 120 156 Z" fill="${skin}"/><path d="M80 156 Q100 178 120 156" stroke="rgba(0,0,0,.2)" stroke-width="2.5" fill="none"/>`;
-  if (c.top === "hoodie") s += `<path d="M84 160 Q100 176 116 160 Z" fill="${skin}"/><path d="M92 172 L90 194 M108 172 L110 194" stroke="rgba(255,255,255,.85)" stroke-width="3" stroke-linecap="round"/>`;
-  if (c.top === "collar") s += `<path d="M82 156 Q100 176 118 156 Z" fill="${skin}"/><path d="M80 154 L100 178 L88 184 L72 160 Z M120 154 L100 178 L112 184 L128 160 Z" fill="#fff" stroke="rgba(0,0,0,.25)" stroke-width="2"/>`;
-  if (c.top === "kurta") s += `<path d="M84 156 Q100 172 116 156 Z" fill="${skin}"/><path d="M84 156 Q100 172 116 156" stroke="rgba(0,0,0,.25)" stroke-width="2.5" fill="none"/><path d="M100 170 L100 200" stroke="rgba(0,0,0,.22)" stroke-width="3"/>${[178, 188, 198].map((y) => `<circle cx="100" cy="${y}" r="2.6" fill="#fff" stroke="rgba(0,0,0,.25)" stroke-width="1"/>`).join("")}`;
+  if (c.top === "tee") s += `<path stroke="none" d="M80 156 Q100 178 120 156 Z" fill="${skin}"/><path d="M80 156 Q100 178 120 156" stroke="rgba(0,0,0,.2)" stroke-width="2.5" fill="none"/>`;
+  if (c.top === "hoodie") s += `<path stroke="none" d="M84 160 Q100 176 116 160 Z" fill="${skin}"/><path d="M92 172 L90 194 M108 172 L110 194" stroke="rgba(255,255,255,.85)" stroke-width="3" stroke-linecap="round"/>`;
+  if (c.top === "collar") s += `<path stroke="none" d="M82 156 Q100 176 118 156 Z" fill="${skin}"/><path d="M80 154 L100 178 L88 184 L72 160 Z M120 154 L100 178 L112 184 L128 160 Z" fill="#fff" stroke="rgba(0,0,0,.25)" stroke-width="2"/>`;
+  if (c.top === "kurta") s += `<path stroke="none" d="M84 156 Q100 172 116 156 Z" fill="${skin}"/><path d="M84 156 Q100 172 116 156" stroke="rgba(0,0,0,.25)" stroke-width="2.5" fill="none"/><path d="M100 170 L100 200" stroke="rgba(0,0,0,.22)" stroke-width="3"/>${[178, 188, 198].map((y) => `<circle cx="100" cy="${y}" r="2.6" fill="#fff" stroke="rgba(0,0,0,.25)" stroke-width="1"/>`).join("")}`;
 
   // ---- head ----
-  s += `<ellipse cx="53" cy="99" rx="7" ry="10" fill="${skin}"/><ellipse cx="147" cy="99" rx="7" ry="10" fill="${skin}"/><ellipse cx="53" cy="100" rx="3" ry="5" fill="rgba(0,0,0,.1)"/><ellipse cx="147" cy="100" rx="3" ry="5" fill="rgba(0,0,0,.1)"/>`;
+  s += `<ellipse cx="53" cy="99" rx="7" ry="10" fill="${skin}"/><ellipse cx="147" cy="99" rx="7" ry="10" fill="${skin}"/><ellipse stroke="none" cx="53" cy="100" rx="3" ry="5" fill="rgba(0,0,0,.1)"/><ellipse stroke="none" cx="147" cy="100" rx="3" ry="5" fill="rgba(0,0,0,.1)"/>`;
   s += `<path d="${head}" fill="${skin}"/>`;
-  s += `<circle cx="71" cy="113" r="8" fill="#FF6F7F" opacity=".2"/><circle cx="129" cy="113" r="8" fill="#FF6F7F" opacity=".2"/>`;
-  if (c.marks === "freckles") s += [[70,106],[77,110],[84,107],[116,107],[123,110],[130,106],[76,116],[124,116]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.5" fill="rgba(110,60,25,.5)"/>`).join("");
+  s += `<circle stroke="none" cx="71" cy="113" r="8" fill="#FF6F7F" opacity=".22"/><circle stroke="none" cx="129" cy="113" r="8" fill="#FF6F7F" opacity=".22"/>`;
+  if (c.marks === "freckles") s += [[70,106],[77,110],[84,107],[116,107],[123,110],[130,106],[76,116],[124,116]].map(([x, y]) => `<circle stroke="none" cx="${x}" cy="${y}" r="1.5" fill="rgba(110,60,25,.5)"/>`).join("");
 
   // ---- facial hair (before the mouth) ----
-  if (c.beard === "stubble") s += `<path d="M56 100 Q56 148 100 150 Q144 148 144 100 Q140 124 100 128 Q60 124 56 100Z" fill="${hc}" opacity=".18"/>`;
-  if (c.beard === "beard") s += `<path d="M55 102 Q52 154 100 158 Q148 154 145 102 Q140 118 120 121 Q100 126 80 121 Q60 118 55 102Z" fill="${hc}"/><ellipse cx="100" cy="127" rx="15" ry="8" fill="${skin}"/>`;
+  if (c.beard === "stubble") s += `<path stroke="none" d="M56 100 Q56 148 100 150 Q144 148 144 100 Q140 124 100 128 Q60 124 56 100Z" fill="${hc}" opacity=".2"/>`;
+  if (c.beard === "beard") s += `<path d="M55 102 Q52 154 100 158 Q148 154 145 102 Q140 118 120 121 Q100 126 80 121 Q60 118 55 102Z" fill="${hc}"/><ellipse stroke="none" cx="100" cy="127" rx="15" ry="8" fill="${skin}"/>`;
 
   // ---- eyes ----
   const L = 80, R = 120, ey = 97, brow = `stroke="${INK}" stroke-width="3.6" stroke-linecap="round" fill="none" opacity=".85"`;
   s += `<path d="M69 82 Q80 75 91 81 M109 81 Q120 75 131 82" ${brow}/>`;
-  const openEye = (x, r = 8, ir = 5) => `<ellipse cx="${x}" cy="${ey}" rx="${r}" ry="${r + 1}" fill="#fff"/><circle cx="${x + 1}" cy="${ey + 1}" r="${ir}" fill="${INK}"/><circle cx="${x + 3}" cy="${ey - 2}" r="1.7" fill="#fff"/><path d="M${x - r - 1} ${ey - 3} Q${x} ${ey - r - 6} ${x + r + 1} ${ey - 3}" stroke="${INK}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+  const openEye = (x, r = 8, ir = 5) => `<ellipse stroke="none" cx="${x}" cy="${ey}" rx="${r}" ry="${r + 1}" fill="#fff"/><circle stroke="none" cx="${x + 1}" cy="${ey + 1}" r="${ir}" fill="${INK}"/><circle stroke="none" cx="${x + 3}" cy="${ey - 2}" r="1.7" fill="#fff"/><path d="M${x - r - 1} ${ey - 3} Q${x} ${ey - r - 6} ${x + r + 1} ${ey - 3}" stroke="${INK}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
   const happyEye = (x) => `<path d="M${x - 9} ${ey + 2} Q${x} ${ey - 9} ${x + 9} ${ey + 2}" stroke="${INK}" stroke-width="3.8" fill="none" stroke-linecap="round"/>`;
   if (c.eyes === "open") s += openEye(L) + openEye(R);
   if (c.eyes === "wide") s += openEye(L, 9.5, 6) + openEye(R, 9.5, 6);
@@ -129,5 +129,5 @@ export function renderAvatar(config) {
   if (c.hat === "turban") s += `<path d="M46 82 C42 34 76 20 100 20 C124 20 158 34 154 82 C142 66 124 60 100 60 C76 60 58 66 46 82Z" fill="${tc}" ${edge}/><path d="M52 64 C80 44 120 44 148 64 M50 74 C84 54 118 54 150 74 M68 40 C90 32 114 34 132 44" stroke="rgba(0,0,0,.2)" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M94 36 Q100 26 108 38" stroke="rgba(0,0,0,.2)" stroke-width="3" fill="none" stroke-linecap="round"/>`;
   if (scarf) s += `<path fill-rule="evenodd" fill="${tc}" ${edge} d="M46 96 C40 40 74 22 100 22 C126 22 160 40 154 96 C154 130 152 152 144 172 L56 172 C48 152 46 130 46 96Z M62 92 C62 64 78 50 100 50 C122 50 138 64 138 92 C138 122 124 152 100 152 C76 152 62 122 62 92Z"/><path d="M60 150 Q100 170 140 150" stroke="rgba(0,0,0,.15)" stroke-width="3" fill="none"/>`;
 
-  return s + "</svg>";
+  return s + "</g></svg>";
 }

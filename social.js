@@ -1,9 +1,9 @@
 // Social platforms: we store only a clean handle and build the link ourselves (never store raw URLs).
 export const PLATFORMS = [
-  { id: "instagram", label: "Instagram", icon: "📸", ph: "username", hint: "Your Instagram username" },
-  { id: "snapchat", label: "Snapchat", icon: "👻", ph: "username", hint: "Your Snapchat username" },
-  { id: "linkedin", label: "LinkedIn", icon: "💼", ph: "profile link or name-123", hint: "Paste your profile link" },
-  { id: "discord", label: "Discord", icon: "🎮", ph: "username", hint: "Your Discord username" },
+  { id: "instagram", mono: "IG", label: "Instagram", icon: "📸", ph: "username", hint: "Your Instagram username" },
+  { id: "snapchat", mono: "SC", label: "Snapchat", icon: "👻", ph: "username", hint: "Your Snapchat username" },
+  { id: "linkedin", mono: "in", label: "LinkedIn", icon: "💼", ph: "profile link or name-123", hint: "Paste your profile link" },
+  { id: "discord", mono: "DC", label: "Discord", icon: "🎮", ph: "username", hint: "Your Discord username" },
 ];
 
 // returns a clean handle string, or null if invalid

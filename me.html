@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Profile — FAF</title>
-  <meta name="theme-color" content="#F4F6FB">
+  <meta name="theme-color" content="#EEF0F8">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,7 +15,7 @@
 </head>
 <body>
 <main>
-  <span class="logo">FAF</span>
+  <span class="logo">faf</span>
   <h1 class="pagehead">Your profile</h1>
   <p class="sub">This is how other students see you.</p>
   <div id="app"><div class="skelpass"><div class="pass-band"></div><div class="pass-av"></div><div class="line"></div><div class="line s"></div></div></div>
@@ -24,7 +24,7 @@
   import { db, watchUser } from "./firebase.js";
   import { doc, getDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
   import { PLATFORMS } from "./social.js";
-  import { esc, passHtml, mountNav } from "./ui.js";
+  import { esc, passHtml, mountNav, badge } from "./ui.js";
   mountNav("me");
   watchUser(async (u) => {
     if (!u) { location.href = "welcome.html"; return; }
@@ -32,12 +32,12 @@
     const p = snap.exists() ? snap.data() : {};
     if (!p.profileComplete) { location.href = "home.html"; return; }
     const socials = await getDocs(collection(db, "users", u.uid, "socials"));
-    const rows = []; socials.forEach((d) => { const pl = PLATFORMS.find((x) => x.id === d.id); if (pl) rows.push(`<div class="conn plain">${pl.icon} ${pl.label}: <b>${esc(d.data().handle)}</b>${d.data().visible === false ? " (hidden)" : ""}</div>`); });
+    const rows = []; socials.forEach((d) => { const pl = PLATFORMS.find((x) => x.id === d.id); if (pl) rows.push(`<div class="conn plain">${badge(pl.id, pl.mono)} ${pl.label}: <b>${esc(d.data().handle)}</b>${d.data().visible === false ? " (hidden)" : ""}</div>`); });
     document.getElementById("app").innerHTML = passHtml(p, { label: "Campus pass", links: `<p class="lbl">Your links</p>${rows.join("")}` }) + `
       <div class="list" style="margin-top:20px">
-        <a href="profile.html"><span>✏️</span>Edit profile</a>
-        <a href="avatar.html"><span>🙂</span>Edit avatar</a>
-        <a href="social.html"><span>🔗</span>Edit links</a>
+        <a href="profile.html"><span data-i="pencil"></span>Edit profile</a>
+        <a href="avatar.html"><span data-i="smile"></span>Edit avatar</a>
+        <a href="social.html"><span data-i="link"></span>Edit links</a>
       </div>`;
   });
 </script>

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Log in or sign up — FAF</title>
-  <meta name="theme-color" content="#E3DCFF">
+  <meta name="theme-color" content="#2B3AF2">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,10 +16,10 @@
 <body class="welbody">
 <div class="wel">
   <header class="welhero">
-    <span class="logo">FAF</span>
-    <div class="wavs" id="wavs"></div>
-    <h1>Meet someone new.</h1>
+    <div class="row"><span class="logo">faf</span><div id="bigMark" style="margin-left:auto;width:84px;height:84px"></div></div>
+    <h1>Meet<br>someone new.</h1>
     <p>You never know who you've crossed paths with.</p>
+    <div class="wphotos" id="wavs"></div>
   </header>
 
   <section class="welcard">
@@ -54,6 +54,7 @@
   import { GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
   import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
   import { renderAvatar } from "./avatar.js";
+  import { mark, trackEyes } from "./brand.js";
 
   const $ = (id) => document.getElementById(id);
   let busy = false; // stops the auto-redirect while we're checking an account
@@ -64,7 +65,8 @@
     { skin: 5, eyes: "wink", mouth: "smirk", hair: "sidepart", hairColor: 0, beard: "stubble", top: "collar", topColor: 5, bg: 4 },
     { skin: 2, eyes: "open", mouth: "smile", hat: "scarf", top: "kurta", topColor: 7, bg: 1 },
   ];
-  $("wavs").innerHTML = faces.map((c) => `<div class="wav">${renderAvatar(c)}</div>`).join("");
+  $("wavs").innerHTML = faces.map((c) => `<div class="wph">${renderAvatar(c)}</div>`).join("");
+  $("bigMark").innerHTML = mark("live"); trackEyes();
   if (isStandalone()) $("aboutRow").hidden = true; // the installed app doesn't need the marketing page
 
   // ---- tabs ----

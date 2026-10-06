@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FAF</title>
-  <meta name="theme-color" content="#F4F6FB">
+  <meta name="theme-color" content="#EEF0F8">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,22 +15,22 @@
 </head>
 <body>
 <main>
-  <span class="logo">FAF</span>
+  <span class="logo">faf</span>
   <h1 class="pagehead" id="hello">Meet someone new.</h1>
   <p class="sub">You never know who you've crossed paths with.</p>
 
   <div class="banner" id="installBanner" hidden>
-    <span class="bico">📲</span>
+    <span class="bico" data-i="download" data-s="20"></span>
     <div><b>Get the FAF app</b><span>Add it to your home screen in one tap.</span></div>
     <button class="btn ghost" data-install type="button">Install</button>
-    <button class="x" id="bannerX" aria-label="Dismiss" type="button">✕</button>
+    <button class="x" id="bannerX" aria-label="Dismiss" type="button" data-i="x" data-s="14"></button>
   </div>
 
   <span class="lbl">Where do you want to look?</span>
   <div class="modes" id="modes" role="group" aria-label="Where to look">
-    <button class="mode" data-m="university" aria-pressed="true"><span class="ico">🏫</span><b>My university</b><i>Students from your university</i></button>
-    <button class="mode" data-m="other" aria-pressed="false"><span class="ico">🎓</span><b>Other universities</b><i>Students from across India</i></button>
-    <button class="mode" data-m="state" aria-pressed="false"><span class="ico">📍</span><b>My state</b><i>Students from universities in your state</i></button>
+    <button class="mode" data-m="university" aria-pressed="true"><span class="ico" data-i="building"></span><span><b>My university</b><i>Students from your university</i></span></button>
+    <button class="mode" data-m="other" aria-pressed="false"><span class="ico" data-i="globe"></span><span><b>Other universities</b><i>Students from across India</i></span></button>
+    <button class="mode" data-m="state" aria-pressed="false"><span class="ico" data-i="pin"></span><span><b>My state</b><i>Students from universities in your state</i></span></button>
   </div>
   <button class="btn big" id="find" disabled>Find someone</button>
   <div id="out" aria-live="polite"></div>
@@ -41,7 +41,8 @@
     from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
   import { PLATFORMS, normalizeHandle, linkFor } from "./social.js";
   import { syncPool } from "./pool.js";
-  import { esc, LABELS, mountNav, passHtml, toast } from "./ui.js";
+  import { esc, LABELS, mountNav, passHtml, toast, badge } from "./ui.js";
+  import { mark, icon, trackEyes } from "./brand.js";
   import { track } from "./analytics.js";
   import { adHtml, mountAd } from "./ads.js";
   import { isStandalone } from "./install.js";
@@ -151,7 +152,7 @@
   const LOOKING = { university: ["Looking around your campus…", "Checking the canteen…", "Peeking into the library…"], other: ["Looking across India…", "Checking other campuses…", "Asking around…"], state: ["Looking around your state…", "Checking nearby campuses…", "Asking around…"] };
   function showLoading() {
     const lines = LOOKING[mode]; let i = 0;
-    $("out").innerHTML = `<div class="skelpass"><div class="pass-band"></div><div class="pass-av"></div><div class="line"></div><div class="line s"></div><p id="looking">${lines[0]}</p></div>`;
+    $("out").innerHTML = `<div class="looking"><div class="mark-wrap">${mark("look")}</div><p id="looking">${lines[0]}</p><div class="barbar"></div></div>`;
     clearInterval(spinTimer);
     spinTimer = setInterval(() => { i = (i + 1) % lines.length; const el = $("looking"); if (el) el.textContent = lines[i]; }, 900);
   }
@@ -221,7 +222,7 @@
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center">${alt.map((m) => `<button class="btn ghost" data-switch="${m}">Try ${names[m].toLowerCase()}</button>`).join("")}</div>
       </div>
       <p class="caption">The more friends join, the better this gets.</p>
-      <div style="text-align:center;margin-top:8px"><button class="btn ghost" id="share">📣 Invite friends</button></div>`;
+      <div style="text-align:center;margin-top:8px"><button class="btn ghost" id="share">${icon("share", 18)} Invite friends</button></div>`;
     $("out").querySelectorAll("[data-switch]").forEach((b) => b.onclick = () => { mode = b.dataset.switch; paintMode(); startSession(); });
     $("share").onclick = share;
     $("find").textContent = "Find someone";
@@ -243,13 +244,13 @@
       if (!h) return "";
       const url = linkFor(pid, h);
       return url
-        ? `<a class="conn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${pl.icon} Open on ${pl.label}</a>`
-        : `<div class="conn plain">${pl.icon} ${pl.label}: <b>${esc(h)}</b></div>`;
+        ? `<a class="conn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${badge(pl.id, pl.mono)} Open on ${pl.label}</a>`
+        : `<div class="conn plain">${badge(pl.id, pl.mono)} ${pl.label}: <b>${esc(h)}</b></div>`;
     }).join("");
     $("out").innerHTML = `
       <div class="deck"><div class="swipecard" id="card">${passHtml(d, { shared, label: "Campus pass", links: `<p class="lbl">Say hi on</p><div id="conns">${links || '<p class="hint">No links shared.</p>'}</div>` })}</div></div>
-      <p class="swipehint">⟵ Swipe left or right for the next student ⟶</p>
-      <div style="text-align:center;margin-top:8px"><button class="btn ghost" id="share">📣 Share FAF</button></div>
+      <p class="swipehint">${icon("left", 18)} Swipe left or right for the next student ${icon("right", 18)}</p>
+      <div style="text-align:center;margin-top:8px"><button class="btn ghost" id="share">${icon("share", 18)} Share FAF</button></div>
       ${shownCount % 8 === 0 ? adHtml() : ""}`;
     $("share").onclick = share;
     $("conns").onclick = (e) => { if (e.target.closest(".conn")) track("external_social_clicked", ["connectClicks"]); };

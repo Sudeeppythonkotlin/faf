@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Your profile — FAF</title>
-  <meta name="theme-color" content="#F4F6FB">
+  <meta name="theme-color" content="#EEF0F8">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-180.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,7 +15,7 @@
 </head>
 <body>
 <main>
-  <span class="logo">FAF</span>
+  <span class="logo">faf</span>
   <div id="stepSlot"></div>
   <h1 class="pagehead">Tell us about you</h1>
   <p class="sub">Only your first name, age, college and interests are shown to others.</p>
@@ -93,7 +93,7 @@
     $("uni").setAttribute("aria-expanded", String(!$("sugg").hidden));
     $("sugg").innerHTML = hits.map((u) => `<li role="option" data-id="${u.id}">${u.name}<small>${u.state}</small></li>`).join("");
   }
-  function pickUni(u) { chosenUni = u; $("uni").value = u.name; $("sugg").hidden = true; $("state").hidden = false; $("state").textContent = "📍 " + u.state; clearMsg("uni"); }
+  function pickUni(u) { chosenUni = u; $("uni").value = u.name; $("sugg").hidden = true; $("state").hidden = false; $("state").textContent = u.state; clearMsg("uni"); }
   $("uni").addEventListener("input", () => { const exact = findUniversityByName($("uni").value); if (exact) pickUni(exact); else { chosenUni = null; $("state").hidden = true; showSugg(); } });
   $("uni").addEventListener("focus", showSugg);
   $("sugg").addEventListener("mousedown", (e) => e.preventDefault());
