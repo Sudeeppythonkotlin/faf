@@ -25,6 +25,7 @@
   import { doc, getDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
   import { PLATFORMS } from "./social.js";
   import { esc, passHtml, mountNav, badge } from "./ui.js";
+  import { hydrateIcons } from "./brand.js";
   mountNav("me");
   watchUser(async (u) => {
     if (!u) { location.href = "welcome.html"; return; }
@@ -39,6 +40,7 @@
         <a href="avatar.html"><span data-i="smile"></span>Edit avatar</a>
         <a href="social.html"><span data-i="link"></span>Edit links</a>
       </div>`;
+    hydrateIcons();
   });
 </script>
 </body>

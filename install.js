@@ -1,3 +1,4 @@
+import { mark } from "./brand.js";
 // Registers the service worker and powers every "Install app" button (any element with the data-install attribute).
 if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 
@@ -23,6 +24,7 @@ function showSheet() {
   const wrap = document.createElement("div");
   wrap.className = "sheetwrap";
   wrap.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="${s.title}">
+    <div class="sheetmark">${mark("look")}</div>
     <h2>${s.title}</h2>
     <ol>${s.list.map((x) => `<li>${x}</li>`).join("")}</ol>
     <p class="hint">It's free and uses almost no space. It opens like any other app.</p>

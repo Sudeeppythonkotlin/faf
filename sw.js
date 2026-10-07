@@ -1,6 +1,6 @@
 // FAF service worker: makes the app installable and keeps a copy of the screens for flaky connections.
 // Network first, so every update you publish reaches users straight away.
-const CACHE = "faf-v1";
+const CACHE = "faf-v2";
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/index.html", "/style.css", "/manifest.json", "/icon-192.png"])).catch(() => {}));
   self.skipWaiting();
